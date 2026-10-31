@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blade Studio | 3D Blade Configurator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f3f2ef; --panel:#ffffff; --ink:#141414; --muted:#6d6a65; --line:#e7e4de;
+    --soft:#f6f5f2; --sel:#141414; --ok:#1f7a4d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  button{font:inherit;color:inherit;cursor:pointer}
+  header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:#fff;border-bottom:1px solid var(--line)}
+  .brand{font-family:Montserrat,Inter,sans-serif;font-weight:700;letter-spacing:.14em;font-size:15px}
+  .brand span{color:var(--muted);font-weight:600}
+  .hint{font-size:12px;color:var(--muted)}
+  .app{display:grid;grid-template-columns:1fr 410px;height:calc(100vh - 56px)}
+  .stage{position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 38%,#ffffff 0%,#eeede9 52%,#d8d6d0 100%)}
+  #c{display:block;width:100%;height:100%;outline:none;touch-action:none}
+  .views{position:absolute;top:16px;left:16px;display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100% - 32px)}
+  .pill{border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.85);backdrop-filter:blur(6px);padding:7px 13px;border-radius:999px;font-size:12.5px;font-weight:500;transition:.15s}
+  .pill:hover{background:#fff;border-color:rgba(0,0,0,.2)}
+  .pill.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .tools{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:max-content;max-width:calc(100% - 32px)}
+  .tools .pill{padding:9px 15px}
+  .badge{position:absolute;top:16px;right:16px;font-size:11.5px;color:var(--muted);background:rgba(255,255,255,.75);padding:6px 10px;border-radius:8px}
+  .loader{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(243,242,239,.92);font-size:14px;color:var(--muted);z-index:5;transition:opacity .4s}
+  .loader.hide{opacity:0;pointer-events:none}
+  .spin{width:34px;height:34px;border:3px solid #d9d6cf;border-top-color:var(--ink);border-radius:50%;animation:sp 0.9s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  .panel{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+  .panel-top{padding:20px 22px 10px}
+  .panel-top h1{margin:0 0 4px;font-size:21px;letter-spacing:-.01em}
+  .panel-top p{margin:0;color:var(--muted);font-size:13px}
+  #steps{flex:1;overflow:auto;padding:6px 14px 14px}
+  .step{border:1px solid var(--line);border-radius:14px;margin:8px 0;background:#fff;overflow:hidden}
+  .step-head{width:100%;display:flex;align-items:center;gap:10px;padding:13px 14px;background:none;border:0;text-align:left}
+  .num{width:24px;height:24px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-size:12px;font-weight:600;flex:none}
+  .step.open .num{background:var(--ink);color:#fff}
+  .st{font-weight:600;font-size:14px}
+  .val{margin-left:auto;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+  .chev{width:8px;height:8px;border-right:1.5px solid #999;border-bottom:1.5px solid #999;transform:rotate(45deg);margin:0 4px 3px 4px;transition:.2s;flex:none}
+  .step.open .chev{transform:rotate(225deg);margin-bottom:-3px}
+  .step-body{display:none;padding:2px 14px 16px}
+  .step.open .step-body{display:block}
+  .opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+  .opt{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px 9px;border:1.5px solid var(--line);border-radius:12px;background:#fff;transition:.15s}
+  .opt:hover{border-color:#bdb9b0}
+  .opt.sel{border-color:var(--sel);box-shadow:0 0 0 1px var(--sel) inset}
+  .sw{width:40px;height:40px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.12)}
+  .sw.txt{display:grid;place-items:center;background:var(--soft);font-family:Montserrat,sans-serif;font-weight:700;font-size:13px}
+  .on{font-size:12px;font-weight:600;text-align:center;line-height:1.2}
+  .op{font-size:11px;color:var(--muted)}
+  .desc{font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.45}
+  .eng{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-size:14px;margin-bottom:10px;letter-spacing:.05em}
+  .eng:focus{outline:none;border-color:var(--ink)}
+
+  .summary{border-top:1px solid var(--line);padding:14px 20px 18px;background:#fff}
+  .specs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .spec{background:var(--soft);border-radius:10px;padding:8px 10px}
+  .spec b{display:block;font-size:15px}
+  .spec small{color:var(--muted);font-size:11px}
+  .buy{display:flex;align-items:center;gap:14px}
+  .price{font-size:24px;font-weight:700;letter-spacing:-.01em}
+  .price small{display:block;font-size:11px;color:var(--muted);font-weight:500;letter-spacing:0}
+  .cta{flex:1;border:0;background:var(--ink);color:#fff;border-radius:999px;padding:14px 18px;font-weight:600;font-size:14.5px;transition:.15s}
+  .cta:hover{background:#333}
+
+  .modal{position:fixed;inset:0;background:rgba(20,20,20,.45);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+  .modal.show{display:flex}
+  .card{background:#fff;border-radius:18px;max-width:440px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .card h3{margin:0 0 4px}
+  .card p{margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5}
+  .card table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px}
+  .card td{padding:6px 0;border-bottom:1px solid var(--line)}
+  .card td:last-child{text-align:right;font-weight:600}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:11px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.3s;z-index:30;pointer-events:none;max-width:calc(100% - 32px)}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr;height:auto}
+    .stage{height:60vh;min-height:380px}
+    .panel{border-left:0;border-top:1px solid var(--line)}
+    #steps{overflow:visible}
+    .summary{position:sticky;bottom:0;box-shadow:0 -6px 20px rgba(0,0,0,.06)}
+    .hint{display:none}
+    .badge{display:none}
+  }
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<header>
+  <div class="brand">BLADE STUDIO <span>/ 3D CONFIGURATOR</span></div>
+  <div class="hint">Drag to rotate &middot; Scroll to zoom &middot; Right-drag to pan</div>
+</header>
+
+<main class="app">
+  <section class="stage" id="stage">
+    <canvas id="c"></canvas>
+    <div class="views" id="views"></div>
+    <div class="badge">Real-time WebGL &middot; PBR materials</div>
+    <div class="tools">
+      <button class="pill" id="bExplode">Show ply layers</button>
+      <button class="pill" id="bRotate">Auto rotate</button>
+      <button class="pill" id="bRender">Save HD render</button>
+    </div>
+    <div class="loader" id="loader"><div class="spin"></div><div>Preparing wood materials...</div></div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-top">
+      <h1>Design your blade</h1>
+      <p>Every change updates the 3D model, price and weight in real time.</p>
+    </div>
+    <div id="steps"></div>
+    <div class="summary">
+      <div class="specs">
+        <div class="spec"><b id="sWeight">-</b><small>Est. weight</small></div>
+        <div class="spec"><b id="sThick">-</b><small>Thickness</small></div>
+        <div class="spec"><b id="sPly">-</b><small>Construction</small></div>
+      </div>
+      <div class="buy">
+        <div class="price" id="sPrice">-<small>incl. VAT</small></div>
+        <button class="cta" id="bCart">Add to cart</button>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<div class="modal" id="modal">
+  <div class="card">
+    <h3>Added to cart</h3>
+    <p>In the live shop this configuration goes into the WooCommerce cart as one product, with all options, price and weight saved as order item data.</p>
+    <table id="cartTable"></table>
+    <button class="cta" style="width:100%" id="bClose">Continue designing</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ------------------------------------------------------------------ */
+/*  Product data (in the WordPress plugin this comes from the admin)   */
+/* ------------------------------------------------------------------ */
+const EUR = '€';
+const WOODS = {
+  limba:  {name:'Limba',     light:'#dcb983', dark:'#a5743c', freq:26, contrast:.55, sharp:5, warp:.035, figure:.35, pores:.15, density:.56, seed:1.3},
+  koto:   {name:'Koto',      light:'#e8d29c', dark:'#bf9a5a', freq:46, contrast:.45, sharp:6, warp:.02,  figure:.25, pores:.3,  density:.60, seed:4.1},
+  hinoki: {name:'Hinoki',    light:'#f0d9b2', dark:'#d2a676', freq:90, contrast:.42, sharp:8, warp:.01,  figure:.15, pores:0,   density:.41, seed:7.7},
+  walnut: {name:'Walnut',    light:'#8c5f3c', dark:'#3a2315', freq:20, contrast:.6,  sharp:4, warp:.05,  figure:.45, pores:.45, density:.63, seed:2.9},
+  ebony:  {name:'Ebony',     light:'#4d3a2d', dark:'#120c09', freq:30, contrast:.75, sharp:3, warp:.06,  figure:.5,  pores:.1,  density:1.0, seed:9.2},
+  ayous:  {name:'Ayous',     light:'#f1e0bb', dark:'#d4b986', freq:38, contrast:.3,  sharp:5, warp:.02,  figure:.2,  pores:.2,  density:.38, seed:5.5},
+  kiri:   {name:'Kiri',      light:'#f4e6ca', dark:'#dbc29a', freq:22, contrast:.28, sharp:4, warp:.03,  figure:.2,  pores:.25, density:.29, seed:3.3},
+  ash:    {name:'White Ash', light:'#e2c99c', dark:'#a37e4a', freq:16, contrast:.65, sharp:6, warp:.05,  figure:.3,  pores:.35, density:.68, seed:6.6},
+  wenge:  {name:'Wenge',     light:'#6c4c36', dark:'#1c120c', freq:34, contrast:.85, sharp:3, warp:.03,  figure:.3,  pores:.3,  density:.85, seed:8.4},
+};
+const COMPOSITES = {
+  none:   {name:'All wood'},
+  carbon: {name:'Carbon',         color:'#1b1b1d', density:1.50, sw:'repeating-linear-gradient(45deg,#111 0 3px,#2c2c2e 3px 6px)'},
+  alc:    {name:'Arylate Carbon', color:'#2e2a22', density:1.38, sw:'repeating-linear-gradient(45deg,#121212 0 3px,#6d5a2c 3px 5px)'},
+  zlc:    {name:'Zylon Carbon',   color:'#3a3324', density:1.45, sw:'repeating-linear-gradient(45deg,#141414 0 3px,#b08f45 3px 5px)'},
+};
+const STAINS = {
+  natural:{name:'Natural', tint:'#ffffff'}, honey:{name:'Honey', tint:'#f2cf9c'}, smoked:{name:'Smoked', tint:'#9a8a7a'},
+  ocean:{name:'Ocean', tint:'#8fb2db'}, crimson:{name:'Crimson', tint:'#de8a8a'}, jade:{name:'Jade', tint:'#93c7a9'},
+};
+const FINISHES = {
+  natural:{name:'Natural', roughness:.8,  clearcoat:0,   ccr:.5,  bump:1},
+  satin:  {name:'Satin',   roughness:.62, clearcoat:.45, ccr:.3,  bump:.7},
+  gloss:  {name:'Gloss',   roughness:.55, clearcoat:1,   ccr:.04, bump:.45},
+};
+const ACCENTS = {
+  natural:{name:'Natural'}, red:{name:'Red', color:'#b3122b'}, black:{name:'Black', color:'#151515'},
+  blue:{name:'Blue', color:'#1d4fa3'}, gold:{name:'Gold', color:'#c9a04a', metal:true}, teal:{name:'Teal', color:'#0f8b8d'},
+};
+const HANDLES = {FL:{name:'Flared'}, ST:{name:'Straight'}, AN:{name:'Anatomic'}, CO:{name:'Conic'}};
+const ENGRAVE = {
+  burnt:{name:'Laser', color:'#3a2213', roughness:.9, metalness:0},
+  gold:{name:'Gold', color:'#f3c867', roughness:.3, metalness:.6},
+  silver:{name:'Silver', color:'#f2f2f2', roughness:.28, metalness:.6},
+};
+const PRICES = {
+  base:79,
+  outer:{limba:0, koto:10, hinoki:45, walnut:20, ebony:55},
+  composite:{none:0, carbon:25, alc:45, zlc:70},
+  core:{ayous:0, kiri:12, limba:6},
+  stain:{natural:0, honey:10, smoked:10, ocean:10, crimson:10, jade:10},
+  finish:{natural:0, satin:8, gloss:15},
+  handleShape:{FL:0, ST:0, AN:6, CO:4},
+  handleWood:{ash:0, limba:0, walnut:12, wenge:18},
+  accent:{natural:0, red:6, black:6, blue:6, gold:9, teal:6},
+  engraving:9,
+};
+
+const cfg = {
+  outer:'limba', composite:'none', core:'ayous', stain:'natural', finish:'satin',
+  handleShape:'FL', handleWood:'ash', accent:'red', engraving:'', engraveStyle:'burnt', rubbers:'off',
+};
+// shareable designs: ?outer=walnut&composite=carbon&engraving=MAX ...
+{
+  const valid = {...PRICES, engraveStyle:ENGRAVE, rubbers:{off:1, on:1}};
+  new URLSearchParams(location.search).forEach((v, k) => {
+    if (k === 'engraving') cfg.engraving = v.replace(/[^\x20-\x7E]/g, '').slice(0, 16);
+    else if (k in cfg && valid[k] && v in valid[k]) cfg[k] = v;
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Renderer / scene                                                   */
+/* ------------------------------------------------------------------ */
+const canvas = document.getElementById('c');
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true, preserveDrawingBuffer:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = .92;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 100);
+camera.position.set(2.6, 1.2, 4.6);
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, .05, 0);
+controls.enableDamping = true;
+controls.dampingFactor = .08;
+controls.minDistance = .35;
+controls.maxDistance = 12;
+controls.autoRotateSpeed = 1.6;
+
+const key = new THREE.DirectionalLight(0xffffff, 2.3);
+key.position.set(1.2, 8, 2.2);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, {left:-2.5, right:2.5, top:2.5, bottom:-2.5, near:.5, far:20});
+key.shadow.bias = -.0004;
+key.shadow.normalBias = .01;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xfff1e0, .9);
+rim.position.set(-4, 2, -3);
+scene.add(rim, new THREE.HemisphereLight(0xffffff, 0xcfc6ba, .55));
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial({opacity:.13}));
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -1.275;
+floor.receiveShadow = true;
+scene.add(floor);
+
+const blade = new THREE.Group();
+blade.scale.setScalar(.01);          // model is built in millimetres
+blade.position.y = .48;
+scene.add(blade);
+
+/* ------------------------------------------------------------------ */
+/*  Procedural wood textures                                           */
+/* ------------------------------------------------------------------ */
+const PERM = new Uint8Array(512);
+{
+  const p = [...Array(256).keys()];
+  let s = 1337;
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  for (let i = 0; i < 512; i++) PERM[i] = p[i & 255];
+}
+function noise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, X = xi & 255, Y = yi & 255;
+  const a = PERM[PERM[X] + Y], b = PERM[PERM[X + 1] + Y], c = PERM[PERM[X] + Y + 1], d = PERM[PERM[X + 1] + Y + 1];
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  return (a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v) / 255;
+}
+function fbm(x, y, oct) {
+  let s = 0, a = .5, f = 1, n = 0;
+  for (let i = 0; i < oct; i++) { s += a * noise(x * f, y * f); n += a; a *= .5; f *= 2; }
+  return s / n;
+}
+const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+
+const texCache = {};
+function woodTex(id) {
+  if (texCache[id]) return texCache[id];
+  const sp = WOODS[id], size = 1024;
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const b = document.createElement('canvas'); b.width = b.height = size;
+  const ctx = c.getContext('2d'), bctx = b.getContext('2d');
+  const img = ctx.createImageData(size, size), bimg = bctx.createImageData(size, size);
+  const d = img.data, bd = bimg.data, L = hexRgb(sp.light), D = hexRgb(sp.dark), sd = sp.seed * 17.3;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const warp = fbm(u * 2.2 + sd, v * .45, 3) - .5;
+      const wig = noise(u * 14 + sd, v * 2.5) - .5;
+      const r = (u + warp * sp.warp * 4 + wig * .006) * sp.freq + fbm(u * 5 + sd, v * .25, 2) * 3;
+      const late = Math.pow(r - Math.floor(r), sp.sharp);
+      const fiber = noise(u * size * .45, v * 5 + sd) - .5;
+      const tone = (fbm(u * 1.6 + sd, v * .5, 2) - .5) * .6 + (fbm(u * 9 + sd, v * .22, 3) - .5) * .9;
+      let t = late * sp.contrast * .65 + fiber * .2 + tone * sp.figure * 1.8 + .22;
+      if (sp.pores) { const p = noise(u * size * .3 + sd, v * size * .025); if (p > .8) t += (p - .8) * 5 * sp.pores; }
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const i = (y * size + x) * 4;
+      d[i] = L[0] + (D[0] - L[0]) * t; d[i + 1] = L[1] + (D[1] - L[1]) * t; d[i + 2] = L[2] + (D[2] - L[2]) * t; d[i + 3] = 255;
+      const g = 255 * (1 - late * .75 - Math.max(0, fiber) * .35);
+      bd[i] = bd[i + 1] = bd[i + 2] = g; bd[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0); bctx.putImageData(bimg, 0, 0);
+  const aniso = renderer.capabilities.getMaxAnisotropy();
+  const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = aniso;
+  const bump = new THREE.CanvasTexture(b); bump.anisotropy = aniso;
+  return (texCache[id] = {map, bump});
+}
+
+function woodMat(id, finish, tint = '#ffffff', bumpK = 1) {
+  const t = woodTex(id), f = FINISHES[finish];
+  return new THREE.MeshPhysicalMaterial({
+    map:t.map, bumpMap:t.bump, bumpScale:.9 * f.bump * bumpK, color:new THREE.Color(tint),
+    roughness:f.roughness, clearcoat:f.clearcoat, clearcoatRoughness:f.ccr,
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Geometry                                                           */
+/* ------------------------------------------------------------------ */
+// Head outline: slightly egg-shaped superellipse, 150 x 157 mm
+const HEAD_PTS = (() => {
+  const pts = [], N = 220, n = 2.25;
+  for (let i = 0; i < N; i++) {
+    const a = i / N * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+    const ce = Math.sign(c) * Math.pow(Math.abs(c), 2 / n), se = Math.sign(s) * Math.pow(Math.abs(s), 2 / n);
+    pts.push(new THREE.Vector2(75 * ce * (1 + .045 * s), 78.5 * se));
+  }
+  return pts;
+})();
+const HEAD_SHAPE = new THREE.Shape(HEAD_PTS);
+const RUBBER_SHAPE = new THREE.Shape(HEAD_PTS.filter(p => p.y > -70).map(p => new THREE.Vector2(p.x * .994, p.y * .994)));
+const HEAD_AREA = (() => { let a = 0; HEAD_PTS.forEach((p, i) => { const q = HEAD_PTS[(i + 1) % HEAD_PTS.length]; a += p.x * q.y - q.x * p.y; }); return Math.abs(a) / 2 / 100; })(); // cm2
+
+function plyGeom(shape, depth, mirror) {
+  const g = new THREE.ExtrudeGeometry(shape, {depth, bevelEnabled:false, curveSegments:1, steps:1});
+  const p = g.attributes.position, uv = g.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    let u = p.getX(i) / 175 + .5;
+    if (mirror) u = 1 - u;
+    uv.setXY(i, u, p.getY(i) / 175 + .5);
+  }
+  return g;
+}
+
+// Handle: superellipse cross sections swept along the length
+const HY0 = -74, HL = 100;
+const smooth = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a))); return x * x * (3 - 2 * x); };
+function profile(shape, t) {
+  const bump = (c, s) => Math.exp(-(((t - c) / s) ** 2));
+  let w = 25, h = 23;
+  if (shape === 'FL') { w = 25 - 1.6 * bump(.45, .2) + 8 * Math.pow(smooth(.5, 1, t), 1.4); h = 23 + 2.5 * smooth(.6, 1, t); }
+  if (shape === 'ST') { w = 25.5; h = 23; }
+  if (shape === 'AN') { w = 25 + 3.4 * bump(.6, .22); h = 23 + 3 * bump(.58, .22); }
+  if (shape === 'CO') { w = 24 + 5 * t; h = 22 + 2.5 * t; }
+  const k = smooth(0, .16, t);            // throat: blends into the blade
+  h = 6.6 + (h - 6.6) * k;
+  w = w + 6 * (1 - k);
+  let f = 1;
+  if (t < .012) f = Math.sqrt(1 - (1 - t / .012) ** 2);
+  if (t > .965) f = Math.pow(Math.max(0, 1 - ((t - .965) / .035) ** 4), .25);
+  return {w:w * f, h:h * f, f};
+}
+function tube(shape, o = {}) {
+  const {n = 3.2, padW = 0, padH = 0, fixedH = null, phi0 = 0, phi1 = Math.PI * 2, t0 = 0, t1 = 1, R = 180, S = 72, strip = false} = o;
+  const pos = [], uv = [], idx = [];
+  let vol = 0, prevA = null, prevY = 0;
+  for (let i = 0; i <= R; i++) {
+    const s = i / R;
+    const t = strip ? t0 + (t1 - t0) * s : s - .9 * Math.sin(2 * Math.PI * s) / (2 * Math.PI);
+    const pr = profile(shape, t);
+    const W = pr.w / 2 + padW, H = (fixedH != null ? fixedH / 2 * Math.min(1, pr.f * 4) : pr.h / 2) + padH;
+    const y = HY0 - t * HL;
+    let area = 0, px = null, pz = null;
+    for (let j = 0; j <= S; j++) {
+      const ph = phi0 + (phi1 - phi0) * j / S, c = Math.cos(ph), sn = Math.sin(ph);
+      const x = W * Math.sign(c) * Math.pow(Math.abs(c), 2 / n), z = H * Math.sign(sn) * Math.pow(Math.abs(sn), 2 / n);
+      pos.push(x, y, z);
+      if (strip) uv.push((t1 - t) / (t1 - t0), (ph - phi0) / (phi1 - phi0));
+      else uv.push(.27 + .47 * j / S, .15 + .6 * t);
+      if (px !== null) area += px * z - x * pz;
+      px = x; pz = z;
+    }
+    area = Math.abs(area) / 2;
+    if (prevA !== null) vol += (area + prevA) / 2 * Math.abs(prevY - y);
+    prevA = area; prevY = y;
+  }
+  for (let i = 0; i < R; i++) for (let j = 0; j < S; j++) {
+    const a = i * (S + 1) + j, b = a + S + 1, c = a + 1, d = b + 1;
+    idx.push(a, c, b, c, d, b);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return {geo:g, vol:vol / 1000}; // cm3
+}
+
+let engraveTexture = null;
+function makeEngraveTexture(text) {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 240;
+  const g = c.getContext('2d');
+  let fs = 112;
+  const setFont = () => g.font = `700 ${fs}px Montserrat, Arial, sans-serif`;
+  setFont();
+  if ('letterSpacing' in g) g.letterSpacing = '8px';
+  const tw = g.measureText(text).width;
+  if (tw > 930) { fs *= 930 / tw; setFont(); }
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 512, 126);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Build the blade from the current configuration                     */
+/* ------------------------------------------------------------------ */
+let layers = [], fadeParts = [], handleVol = 0, thickness = 0;
+function build() {
+  blade.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  blade.clear();
+  if (engraveTexture) { engraveTexture.dispose(); engraveTexture = null; }
+  layers = []; fadeParts = [];
+
+  const comp = cfg.composite !== 'none';
+  const half = [{wood:cfg.outer, t:.6, outer:true}];
+  if (comp) half.push({comp:cfg.composite, t:.25}, {wood:'ayous', t:.45});
+  else half.push({wood:'ayous', t:.6});
+  const core = {wood:cfg.core, t:comp ? 3.2 : 3.6};
+  const stack = [...half, core, ...half.slice().reverse()];
+  thickness = stack.reduce((s, l) => s + l.t, 0);
+
+  let z = thickness / 2;
+  stack.forEach(l => {
+    const zb = z - l.t, zc = (z + zb) / 2, back = zc < 0;
+    let mat;
+    if (l.comp) mat = new THREE.MeshPhysicalMaterial({color:COMPOSITES[l.comp].color, roughness:.35, metalness:.3, clearcoat:.6});
+    else mat = woodMat(l.wood, cfg.finish, l.outer ? STAINS[cfg.stain].tint : '#ffffff');
+    const m = new THREE.Mesh(plyGeom(HEAD_SHAPE, l.t, back), mat);
+    m.position.z = zb;
+    m.castShadow = m.receiveShadow = true;
+    m.userData = {base:zb, zc, push:0};
+    blade.add(m); layers.push(m);
+    z = zb;
+  });
+
+  if (cfg.rubbers === 'on') {
+    [[1, '#c0142e'], [-1, '#141414']].forEach(([side, col]) => {
+      const sponge = new THREE.MeshStandardMaterial({color:'#f2c14e', roughness:.95});
+      const top = new THREE.MeshPhysicalMaterial({color:col, roughness:.48, clearcoat:.25, clearcoatRoughness:.5, sheen:.4, sheenColor:new THREE.Color(col)});
+      const parts = [[sponge, 1.9], [top, .4]];
+      let zz = side * thickness / 2;
+      parts.forEach(([mat, t]) => {
+        const zb = side > 0 ? zz : zz - t;
+        const m = new THREE.Mesh(plyGeom(RUBBER_SHAPE, t, side < 0), mat);
+        m.position.z = zb;
+        m.castShadow = m.receiveShadow = true;
+        m.userData = {base:zb, zc:zb + t / 2, push:side * 10};
+        blade.add(m); layers.push(m);
+        zz += side * t;
+      });
+    });
+  }
+
+  const h = tube(cfg.handleShape);
+  handleVol = h.vol;
+  const handle = new THREE.Mesh(h.geo, woodMat(cfg.handleWood, cfg.finish, '#ffffff', .25));
+  handle.castShadow = handle.receiveShadow = true;
+
+  const ac = ACCENTS[cfg.accent];
+  const stripeMat = ac.color
+    ? new THREE.MeshPhysicalMaterial({color:ac.color, roughness:ac.metal ? .3 : .35, metalness:ac.metal ? .9 : 0, clearcoat:ac.metal ? 0 : .8})
+    : woodMat('ayous', cfg.finish);
+  const stripe = new THREE.Mesh(tube(cfg.handleShape, {n:12, padW:.14, fixedH:1.3, S:48}).geo, stripeMat);
+  stripe.castShadow = true;
+  blade.add(handle, stripe);
+  fadeParts.push(handle, stripe);
+
+  const text = cfg.engraving.trim();
+  if (text) {
+    const es = ENGRAVE[cfg.engraveStyle];
+    engraveTexture = makeEngraveTexture(text.toUpperCase());
+    const em = new THREE.MeshPhysicalMaterial({
+      map:engraveTexture, color:es.color, roughness:es.roughness, metalness:es.metalness,
+      transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2,
+    });
+    const strip = tube(cfg.handleShape, {strip:true, t0:.24, t1:.76, phi0:Math.PI / 2 - .36, phi1:Math.PI / 2 + .36, padW:.06, padH:.06, R:60, S:24});
+    const eng = new THREE.Mesh(strip.geo, em);
+    eng.renderOrder = 2;
+    blade.add(eng);
+    fadeParts.push(eng);
+  }
+  fadeState = -1;
+  updateSummary();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Price / weight                                                     */
+/* ------------------------------------------------------------------ */
+function calcPrice() {
+  let p = PRICES.base;
+  ['outer', 'composite', 'core', 'stain', 'finish', 'handleShape', 'handleWood', 'accent'].forEach(k => p += PRICES[k][cfg[k]] || 0);
+  if (cfg.engraving.trim()) p += PRICES.engraving;
+  return p;
+}
+function calcWeight() {
+  const comp = cfg.composite !== 'none';
+  const ply = (t, dens) => HEAD_AREA * (t / 10) * dens;
+  let w = 2 * ply(.6, WOODS[cfg.outer].density);
+  if (comp) w += 2 * ply(.25, COMPOSITES[cfg.composite].density) + 2 * ply(.45, WOODS.ayous.density);
+  else w += 2 * ply(.6, WOODS.ayous.density);
+  w += ply(comp ? 3.2 : 3.6, WOODS[cfg.core].density);
+  w += handleVol * WOODS[cfg.handleWood].density * .75;
+  w += 2.5 + (cfg.finish === 'gloss' ? 1.5 : cfg.finish === 'satin' ? .8 : 0);
+  return w;
+}
+const fmt = n => EUR + n.toFixed(2);
+function updateSummary() {
+  document.getElementById('sPrice').innerHTML = fmt(calcPrice()) + '<small>incl. VAT</small>';
+  document.getElementById('sWeight').textContent = Math.round(calcWeight()) + ' g';
+  document.getElementById('sThick').textContent = thickness.toFixed(1) + ' mm';
+  document.getElementById('sPly').textContent = cfg.composite === 'none' ? '5-ply' : '5+2 ' + (cfg.composite === 'carbon' ? 'CF' : cfg.composite.toUpperCase());
+}
+
+/* ------------------------------------------------------------------ */
+/*  Camera views                                                       */
+/* ------------------------------------------------------------------ */
+const VIEWS = {
+  hero:   {label:'3/4',          pos:[2.6, 1.2, 4.6],   target:[0, .05, 0]},
+  front:  {label:'Forehand',     pos:[0, .1, 5.6],      target:[0, .05, 0]},
+  back:   {label:'Backhand',     pos:[0, .1, -5.6],     target:[0, .05, 0]},
+  plies:  {label:'Ply detail',   pos:[1.32, .66, .2],   target:[.74, .5, 0]},
+  handle: {label:'Handle',       pos:[1.05, -.5, 1.5],  target:[0, -.74, 0]},
+  engrave:{label:null,           pos:[.28, -.74, 1.05], target:[0, -.77, 0]},
+  explode:{label:null,           pos:[3.6, 1.0, 2.4],   target:[0, .25, 0]},
+};
+let tween = null, currentView = 'hero';
+function flyTo(name) {
+  const v = VIEWS[name];
+  currentView = name;
+  document.querySelectorAll('#views .pill').forEach(b => b.classList.toggle('on', b.dataset.v === name));
+  tween = {t:0, fp:camera.position.clone(), ft:controls.target.clone(), tp:new THREE.Vector3(...v.pos), tt:new THREE.Vector3(...v.target)};
+}
+const viewsEl = document.getElementById('views');
+Object.entries(VIEWS).forEach(([k, v]) => {
+  if (!v.label) return;
+  const b = document.createElement('button');
+  b.className = 'pill' + (k === 'hero' ? ' on' : '');
+  b.textContent = v.label; b.dataset.v = k;
+  b.onclick = () => flyTo(k);
+  viewsEl.appendChild(b);
+});
+controls.addEventListener('start', () => { tween = null; document.querySelectorAll('#views .pill').forEach(b => b.classList.remove('on')); });
+
+/* ------------------------------------------------------------------ */
+/*  Configurator panel                                                 */
+/* ------------------------------------------------------------------ */
+const woodSw = id => { const w = WOODS[id]; return `repeating-linear-gradient(90deg,${w.light} 0 5px,${w.dark} 6px 7px,${w.light} 8px 11px)`; };
+const STEPS = [
+  {key:'outer', title:'Outer veneer', view:'hero', desc:'The face veneer gives the blade its look and feel.',
+    opts:Object.keys(PRICES.outer).map(id => ({id, name:WOODS[id].name, sw:woodSw(id)}))},
+  {key:'composite', title:'Composite layer', view:'plies', desc:'Optional fibre layer under the outer veneer. More speed and a bigger sweet spot.',
+    opts:Object.entries(COMPOSITES).map(([id, c]) => ({id, name:c.name, sw:c.sw || woodSw('ayous')}))},
+  {key:'core', title:'Core', view:'plies', desc:'The thick centre ply controls weight and feeling.',
+    opts:Object.keys(PRICES.core).map(id => ({id, name:WOODS[id].name, sw:woodSw(id)}))},
+  {key:'stain', title:'Color stain', view:'front', desc:'Transparent stain, the wood grain stays visible.',
+    opts:Object.entries(STAINS).map(([id, s]) => ({id, name:s.name, sw:`linear-gradient(135deg,${s.tint},#c9a777)`}))},
+  {key:'finish', title:'Finish', view:'hero', desc:'Natural, satin or high gloss lacquer.',
+    opts:Object.entries(FINISHES).map(([id, f]) => ({id, name:f.name, sw:`radial-gradient(circle at 35% 30%,rgba(255,255,255,${f.clearcoat * .9}),transparent 45%),${woodSw('limba')}`}))},
+  {key:'handleShape', title:'Handle shape', view:'handle', desc:'Pick the grip that fits your hand.',
+    opts:Object.entries(HANDLES).map(([id, h]) => ({id, name:h.name, txt:id}))},
+  {key:'handleWood', title:'Handle wood', view:'handle', desc:'Solid wood handle cheeks.',
+    opts:Object.keys(PRICES.handleWood).map(id => ({id, name:WOODS[id].name, sw:woodSw(id)}))},
+  {key:'accent', title:'Handle accent', view:'handle', desc:'Color of the center veneer line on the handle.',
+    opts:Object.entries(ACCENTS).map(([id, a]) => ({id, name:a.name, sw:a.color || woodSw('ayous')}))},
+  {key:'engraving', title:'Personal engraving', view:'engrave', custom:true},
+  {key:'rubbers', title:'Preview with rubbers', view:'hero', desc:'Visual preview only, rubbers are not included in the price.',
+    opts:[{id:'off', name:'Blade only', txt:'-'}, {id:'on', name:'With rubbers', sw:'linear-gradient(90deg,#c0142e 50%,#141414 50%)'}], noPrice:true},
+];
+const stepsEl = document.getElementById('steps');
+function optLabel(st) {
+  if (st.key === 'engraving') return cfg.engraving.trim() ? `"${cfg.engraving.trim()}"` : 'None';
+  return st.opts.find(o => o.id === cfg[st.key]).name;
+}
+function priceTag(st, id) {
+  if (st.noPrice) return '';
+  const p = PRICES[st.key][id] || 0;
+  return p ? '+' + EUR + p : 'Included';
+}
+function refreshHeads() {
+  document.querySelectorAll('.step').forEach(el => { const st = STEPS[el.dataset.i]; el.querySelector('.val').textContent = optLabel(st); });
+}
+STEPS.forEach((st, i) => {
+  const el = document.createElement('section');
+  el.className = 'step' + (i === 0 ? ' open' : '');
+  el.dataset.i = i;
+  el.innerHTML = `<button class="step-head"><span class="num">${i + 1}</span><span class="st">${st.title}</span><span class="val"></span><span class="chev"></span></button><div class="step-body"></div>`;
+  const body = el.querySelector('.step-body');
+  if (st.custom) {
+    body.innerHTML = `<p class="desc">Laser engraved along the handle, up to 16 characters (+${EUR}${PRICES.engraving}).</p>
+      <input class="eng" maxlength="16" placeholder="Type your name" value="">
+      <div class="opts">${Object.entries(ENGRAVE).map(([id, e]) => `<button class="opt${id === cfg.engraveStyle ? ' sel' : ''}" data-id="${id}"><span class="sw" style="background:${id === 'burnt' ? 'radial-gradient(circle,#3a2213 30%,#c9a777 32%)' : e.color}"></span><span class="on">${e.name}</span></button>`).join('')}</div>`;
+    const inp = body.querySelector('.eng');
+    inp.value = cfg.engraving;
+    inp.addEventListener('input', () => { cfg.engraving = inp.value.replace(/[^\x20-\x7E]/g, ''); build(); refreshHeads(); if (currentView !== 'engrave') flyTo('engrave'); });
+    body.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+      cfg.engraveStyle = b.dataset.id;
+      body.querySelectorAll('.opt').forEach(x => x.classList.toggle('sel', x === b));
+      if (!cfg.engraving.trim()) { cfg.engraving = 'GIANPIERO'.slice(0, 16); inp.value = cfg.engraving; }
+      build(); refreshHeads(); flyTo('engrave');
+    });
+  } else {
+    body.innerHTML = `<p class="desc">${st.desc}</p><div class="opts">${st.opts.map(o => `
+      <button class="opt${cfg[st.key] === o.id ? ' sel' : ''}" data-id="${o.id}">
+        ${o.txt ? `<span class="sw txt">${o.txt}</span>` : `<span class="sw" style="background:${o.sw}"></span>`}
+        <span class="on">${o.name}</span><span class="op">${priceTag(st, o.id)}</span>
+      </button>`).join('')}</div>`;
+    body.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+      cfg[st.key] = b.dataset.id;
+      body.querySelectorAll('.opt').forEach(x => x.classList.toggle('sel', x === b));
+      build(); refreshHeads();
+      if (currentView !== st.view && explodeTarget === 0) flyTo(st.view);
+    });
+  }
+  el.querySelector('.step-head').onclick = () => {
+    const open = el.classList.contains('open');
+    document.querySelectorAll('.step').forEach(x => x.classList.remove('open'));
+    if (!open) { el.classList.add('open'); if (explodeTarget === 0) flyTo(st.view); }
+  };
+  stepsEl.appendChild(el);
+});
+
+/* ------------------------------------------------------------------ */
+/*  Tools                                                              */
+/* ------------------------------------------------------------------ */
+let explode = 0, explodeTarget = 0, fadeState = -1;
+const bExplode = document.getElementById('bExplode');
+bExplode.onclick = () => {
+  explodeTarget = explodeTarget ? 0 : 1;
+  bExplode.classList.toggle('on', !!explodeTarget);
+  bExplode.textContent = explodeTarget ? 'Assemble blade' : 'Show ply layers';
+  flyTo(explodeTarget ? 'explode' : 'hero');
+};
+const bRotate = document.getElementById('bRotate');
+bRotate.onclick = () => { controls.autoRotate = !controls.autoRotate; bRotate.classList.toggle('on', controls.autoRotate); };
+
+const toastEl = document.getElementById('toast');
+let toastT;
+function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 3200); }
+
+document.getElementById('bRender').onclick = () => {
+  const size = renderer.getSize(new THREE.Vector2());
+  const prev = renderer.getPixelRatio();
+  const target = Math.min(3600, renderer.capabilities.maxTextureSize);
+  renderer.setPixelRatio(target / Math.max(size.x, size.y));
+  renderer.setSize(size.x, size.y, false);
+  renderer.render(scene, camera);
+  const w = canvas.width, h = canvas.height;
+  canvas.toBlob(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `blade-${cfg.outer}-${cfg.handleShape}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast(`HD render saved: ${w} x ${h} px, transparent background`);
+  }, 'image/png');
+  renderer.setPixelRatio(prev);
+  renderer.setSize(size.x, size.y, false);
+};
+
+const modal = document.getElementById('modal');
+document.getElementById('bCart').onclick = () => {
+  const rows = [
+    ['Outer veneer', WOODS[cfg.outer].name], ['Composite', COMPOSITES[cfg.composite].name], ['Core', WOODS[cfg.core].name],
+    ['Stain', STAINS[cfg.stain].name], ['Finish', FINISHES[cfg.finish].name], ['Handle', `${HANDLES[cfg.handleShape].name}, ${WOODS[cfg.handleWood].name}`],
+    ['Accent', ACCENTS[cfg.accent].name], ['Engraving', cfg.engraving.trim() ? `${cfg.engraving.trim()} (${ENGRAVE[cfg.engraveStyle].name})` : 'None'],
+    ['Est. weight', Math.round(calcWeight()) + ' g'], ['Price', fmt(calcPrice())],
+  ];
+  document.getElementById('cartTable').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1].replace(/</g, '&lt;')}</td></tr>`).join('');
+  modal.classList.add('show');
+};
+document.getElementById('bClose').onclick = () => modal.classList.remove('show');
+modal.onclick = e => { if (e.target === modal) modal.classList.remove('show'); };
+
+/* ------------------------------------------------------------------ */
+/*  Loop                                                               */
+/* ------------------------------------------------------------------ */
+function resize() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / r.height;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+const clock = new THREE.Clock();
+const qa = new THREE.Quaternion(), va = new THREE.Vector3(), vb = new THREE.Vector3();
+function loop() {
+  const dt = Math.min(clock.getDelta(), .05);
+  if (tween) {
+    tween.t = Math.min(1, tween.t + dt / .9);
+    const e = tween.t < .5 ? 4 * tween.t ** 3 : 1 - (-2 * tween.t + 2) ** 3 / 2;
+    controls.target.lerpVectors(tween.ft, tween.tt, e);
+    va.subVectors(tween.fp, tween.ft); vb.subVectors(tween.tp, tween.tt);
+    const la = va.length(), lb = vb.length();
+    qa.setFromUnitVectors(va.clone().normalize(), vb.clone().normalize());
+    const q = new THREE.Quaternion().slerp(qa, e);
+    camera.position.copy(va.normalize().applyQuaternion(q).multiplyScalar(la + (lb - la) * e)).add(controls.target);
+    if (tween.t >= 1) tween = null;
+  }
+  explode += (explodeTarget - explode) * Math.min(1, dt * 5);
+  if (Math.abs(explodeTarget - explode) < .001) explode = explodeTarget;
+  layers.forEach(m => { m.position.z = m.userData.base + (m.userData.zc * 6 + m.userData.push) * explode; });
+  const fade = Math.round(explode * 100) / 100;
+  if (fade !== fadeState) {
+    fadeParts.forEach(m => {
+      const tr = fade > 0 || m.renderOrder === 2;
+      if (m.material.transparent !== tr) { m.material.transparent = tr; m.material.needsUpdate = true; }
+      m.material.opacity = 1 - fade;
+      m.visible = fade < .98;
+      m.castShadow = fade === 0 && m.renderOrder !== 2;
+    });
+    fadeState = fade;
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Start                                                              */
+/* ------------------------------------------------------------------ */
+resize();
+setTimeout(async () => {
+  try { await document.fonts.load('700 40px Montserrat'); } catch (e) {}
+  build();
+  refreshHeads();
+  // deep links: #plies, #handle, #explode ...
+  const h = location.hash.slice(1);
+  if (h === 'explode') { bExplode.click(); tween = null; explode = 1; }
+  const v = VIEWS[h];
+  if (v) { camera.position.set(...v.pos); controls.target.set(...v.target); }
+  loop();
+  document.getElementById('loader').classList.add('hide');
+  // warm up the other wood textures in the background so option changes are instant
+  const rest = Object.keys(WOODS).filter(id => !texCache[id]);
+  const warm = () => { const id = rest.shift(); if (!id) return; woodTex(id); setTimeout(warm, 60); };
+  setTimeout(warm, 400);
+}, 50);
+</script>
+</body>
+</html>
