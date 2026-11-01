@@ -6,7 +6,7 @@
 <title>Blade Studio | 3D Blade Configurator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&family=Michroma&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#f4f3f0; --panel:#ffffff; --ink:#141414; --muted:#6d6a65; --line:#e7e4de;
@@ -165,9 +165,9 @@ import MODEL from './model.js';
 /*  Product data (in the WordPress plugin this comes from the admin)   */
 /* ------------------------------------------------------------------ */
 const EUR = '€';
-// colour + normal maps come from real veneer scans (tools/prep_textures.py), handle = tint for hand-sanded handles
+// colour + normal maps come from real veneer scans (tools/prep_textures.py)
 const WOODS = {
-  palisander:{name:'Palisander', density:.85, handle:'#b4a6ae', photo:true},   // front + back taken from the real Palis photos
+  palisander:{name:'Palisander', density:.85, photo:true},   // front, back and handle taken from the real Palis photos
   ebony:     {name:'Ebony',      density:1.0},
   walnut:    {name:'Walnut',     density:.63},
   limba:     {name:'Limba',      density:.56},
@@ -185,8 +185,8 @@ const COMPOSITES = {
   zlc:    {name:'Zylon Carbon',   color:'#3a3324', density:1.45, sw:'repeating-linear-gradient(45deg,#141414 0 3px,#b08f45 3px 5px)'},
 };
 const FINISHES = {
-  natural:{name:'Natural', roughness:.78, clearcoat:0,   ccr:.5,  bump:1},
-  satin:  {name:'Satin',   roughness:.6,  clearcoat:.4,  ccr:.28, bump:.7},
+  natural:{name:'Natural', roughness:.76, clearcoat:0,   ccr:.5,  bump:1},
+  satin:  {name:'Satin',   roughness:.62, clearcoat:.16, ccr:.42, bump:.8},   // soft sheen like the real Palis faces
   gloss:  {name:'Gloss',   roughness:.5,  clearcoat:1,   ccr:.04, bump:.4},
 };
 const PRINTS = {
@@ -211,8 +211,9 @@ const BADGE_SW = {
   none:'#3a2a24', brazil:'radial-gradient(circle,#1d3f8f 0 22%,#f7d117 23% 45%,#169b3a 46%)', switzerland:'radial-gradient(circle,#fff 0 18%,#d52b1e 19%)',
   italy:'linear-gradient(90deg,#009246 33%,#fff 33% 66%,#ce2b37 66%)', germany:'linear-gradient(#111 33%,#dd0000 33% 66%,#ffce00 66%)', japan:'radial-gradient(circle,#bc002d 0 30%,#fff 31%)',
 };
-const ENDCAPS = {silver:{name:'Silver', color:'#e6e6e6'}, gold:{name:'Gold', color:'#d9b25a'}, none:{name:'Wood only', color:null}};
-const SERIAL = 'SO70' + String(25148 + Math.floor(Math.random() * 7000)).padStart(5, '0');
+// medallion on the butt: white enamel face with black rings and an orange centre (like Palis), rim colour per option
+const ENDCAPS = {silver:{name:'Silver', color:'#d9d9d9', face:'#f4f3ef'}, gold:{name:'Gold', color:'#d9b25a', face:'#f3ead2'}, none:{name:'Wood only', color:null}};
+const SERIAL = 'SO2025' + String(100 + Math.floor(Math.random() * 900));
 
 const cfg = {
   outer:'palisander', composite:'none', core:'ayous', finish:'satin', handleWood:'palisander',
@@ -263,7 +264,9 @@ const rim = new THREE.DirectionalLight(0xfff3e6, .8);
 rim.position.set(-4, 2, -3);
 const back = new THREE.DirectionalLight(0xffffff, 2.4);   // product shots light both faces evenly
 back.position.set(1, 4, -6);
-scene.add(key, rim, back, new THREE.HemisphereLight(0xffffff, 0xd8d2c8, .5));
+const fill = new THREE.DirectionalLight(0xffffff, 1.1);   // bounce from below, so the handle butt is not black
+fill.position.set(1.5, -5, 2);
+scene.add(key, rim, back, fill, new THREE.HemisphereLight(0xffffff, 0xd8d2c8, .5));
 
 const BLADE_H = MODEL.outline.reduce((m, p) => Math.max(m, p[1]), 0);
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial({opacity:.1}));
@@ -292,9 +295,15 @@ function loadTex(url, srgb) {
 }
 function woodTex(id) {
   if (!texCache[id]) {
-    const back = WOODS[id].photo ? loadTex(`textures/${id}_back_col.jpg`, true) : null;
-    texCache[id] = Promise.all([loadTex(`textures/${id}_col.jpg`, true), loadTex(`textures/${id}_nrm.jpg`, false), back])
-      .then(([map, normal, back]) => ({map, normal, back}));
+    // photo woods: separate back face and the real handle wood, normal maps made from the photo pores
+    const photo = WOODS[id].photo, opt = (f, srgb) => photo ? loadTex(`textures/${id}_${f}.jpg`, srgb) : null;
+    texCache[id] = Promise.all([loadTex(`textures/${id}_col.jpg`, true), loadTex(`textures/${id}_nrm.jpg`, false),
+      opt('back_col', true), opt('back_nrm', false), opt('handle_col', true), opt('handle_nrm', false)])
+      .then(([map, normal, back, backNormal, handle, handleNormal]) => {
+        // handle strip is 16 x 50 mm of the real handle, repeated along the handle
+        [handle, handleNormal].forEach(t => t && t.repeat.set(UVS / 16, UVS / 50));
+        return {map, normal, back, backNormal, handle, handleNormal};
+      });
   }
   return texCache[id];
 }
@@ -303,8 +312,12 @@ function woodMat(tex, finish, bumpK = 1) {
   const f = FINISHES[finish], k = f.bump * bumpK;
   return new THREE.MeshPhysicalMaterial({
     map:tex.map, normalMap:tex.normal, normalScale:new THREE.Vector2(k, k),
-    roughness:f.roughness, clearcoat:f.clearcoat, clearcoatRoughness:f.ccr,
+    roughness:f.roughness, clearcoat:f.clearcoat, clearcoatRoughness:f.ccr, envMapIntensity:.7,   // tuned against the Palis photos
   });
+}
+// cut ply edges are sanded end grain: matte, no lacquer
+function edgeMat(tex) {
+  return new THREE.MeshPhysicalMaterial({map:tex.map, normalMap:tex.normal, normalScale:new THREE.Vector2(.4, .4), roughness:.88, envMapIntensity:.8});
 }
 
 /* ------------------------------------------------------------------ */
@@ -337,8 +350,9 @@ const HANDLE_GEOS = MODEL.handles.map((h, k) => {
   const g = toCreasedNormals(raw, Math.PI / 6);   // smooth curves, keep the real edges crisp
   const p = g.attributes.position, n = g.attributes.normal, uv = [];
   for (let i = 0; i < p.count; i++) {
-    const side = Math.abs(n.getX(i)) > Math.abs(n.getZ(i));
-    uv.push((side ? p.getZ(i) * 1.5 + 30 : p.getX(i)) / UVS + .5 + k * .21, p.getY(i) / UVS + .3);
+    const side = Math.abs(n.getX(i)) > Math.abs(n.getZ(i)), butt = n.getY(i) < -.7;
+    if (butt) uv.push(p.getX(i) / UVS + .5, p.getZ(i) * 3 / UVS + .1);   // flat sanded end of the handle
+    else uv.push((side ? p.getZ(i) * 1.5 + 30 : p.getX(i)) / UVS + .5 + k * .21, p.getY(i) / UVS + .3);
   }
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.computeBoundingBox();
@@ -358,24 +372,23 @@ function printTexture() {
   const g = c.getContext('2d');
   const main = cfg.printText.trim(), cls = cfg.printClass;
   g.textBaseline = 'middle';
-  if ('letterSpacing' in g) g.letterSpacing = '10px';
-  g.font = '700 92px Montserrat, Arial, sans-serif';
+  if ('letterSpacing' in g) g.letterSpacing = '8px';
+  const font = '400 74px Michroma, Montserrat, Arial, sans-serif';   // wide extended type like the Palis print
+  g.font = font;
   const w1 = main ? g.measureText(main).width : 0;
-  g.font = '800 92px Montserrat, Arial, sans-serif';
-  const w2 = g.measureText(cls).width, gap = main ? 70 : 0;
-  const s = Math.min(1, 960 / (w1 + gap + w2));
+  const w2 = g.measureText(cls).width, gap = main ? 150 : 0;
+  const s = Math.min(1, 900 / (w1 + gap + w2));
   g.setTransform(s, 0, 0, s, 512 * (1 - s), 128 * (1 - s));
   let x = 512 - (w1 + gap + w2) / 2;
-  // black rounded label behind the print, like on the Palis handle
-  const pad = 58, h = 150, r = h / 2;
-  g.fillStyle = '#0c0b0c';
+  // black inlay plate set into the handle, thin lighter rim where the recess catches the light
+  const pad = 62, h = 140, r = h / 2;
+  g.fillStyle = '#0a090a';
   g.beginPath(); g.roundRect(x - pad, 128 - r, w1 + gap + w2 + 2 * pad, h, r); g.fill();
-  g.fillStyle = '#ffffff';
-  g.font = '700 92px Montserrat, Arial, sans-serif';
-  g.fillText(main, x, 128);
-  g.fillStyle = '#ff7a1a';
-  g.font = '800 92px Montserrat, Arial, sans-serif';
-  g.fillText(cls, x + w1 + gap, 128);
+  g.strokeStyle = '#38343a'; g.lineWidth = 5; g.stroke();
+  g.lineWidth = 5; g.lineJoin = 'round';   // Michroma has one weight, the real print is bolder
+  [[main, x, '#ffffff'], [cls, x + w1 + gap, '#f08a1c']].forEach(([txt, tx, col]) => {
+    g.fillStyle = g.strokeStyle = col; g.fillText(txt, tx, 132); g.strokeText(txt, tx, 132);
+  });
   return canvasTex(c);
 }
 function canvasTex(c) {
@@ -413,28 +426,32 @@ function badgeTexture(id) {
   return canvasTex(c);
 }
 
-// small stamped serial number on the face, just above the handle
+// laser-engraved serial number (used as alpha map): on the face above the handle and on the ply edge of the handle
 function serialTexture() {
-  const c = document.createElement('canvas'); c.width = 512; c.height = 64;
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 128;
   const g = c.getContext('2d');
   g.textBaseline = 'middle'; g.textAlign = 'center';
-  if ('letterSpacing' in g) g.letterSpacing = '4px';
-  g.font = '500 44px "Courier New", monospace';
-  g.fillStyle = '#ffffff';
-  g.fillText(SERIAL, 256, 34);
+  if ('letterSpacing' in g) g.letterSpacing = '6px';
+  g.font = '400 104px "Share Tech Mono", "Courier New", monospace';
+  g.fillStyle = g.strokeStyle = '#ffffff'; g.lineWidth = 3;
+  g.fillText(SERIAL, 512, 68); g.strokeText(SERIAL, 512, 68);
   return canvasTex(c);
 }
 
-// turned medallion on the butt of the handle
-function endcapTexture() {
-  const c = document.createElement('canvas'); c.width = c.height = 256;
-  const g = c.getContext('2d');
-  for (let r = 128; r > 0; r -= 2) {
-    const ring = r > 112 ? .55 : r > 96 ? .9 : r > 88 ? .5 : r > 60 ? .95 - (r % 8 < 2 ? .25 : 0) : r > 52 ? .55 : r > 22 ? .85 - (r % 6 < 2 ? .2 : 0) : .7;
-    const v = Math.round(255 * ring);
-    g.fillStyle = `rgb(${v},${v},${v})`;
-    g.beginPath(); g.arc(128, 128, r, 0, Math.PI * 2); g.fill();
-  }
+// medallion on the butt: white enamel, black turned rings, orange centre, text around the edge
+function endcapTexture(ec) {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d'), C = 256, ring = (r, col) => { g.fillStyle = col; g.beginPath(); g.arc(C, C, r, 0, Math.PI * 2); g.fill(); };
+  ring(256, ec.face);
+  [[150, '#1d1b1c'], [136, ec.face], [116, '#1d1b1c'], [104, ec.face], [86, '#1d1b1c'], [76, ec.face], [60, '#1d1b1c'], [52, ec.face]].forEach(([r, col]) => ring(r, col));
+  ring(26, '#ef7d1a');
+  g.fillStyle = '#4a4646'; g.font = '400 30px Michroma, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const arc = (txt, a0, r, dir) => [...txt].forEach((ch, i) => {
+    const a = a0 + dir * (i - (txt.length - 1) / 2) * .16;
+    g.save(); g.translate(C + Math.cos(a) * r, C + Math.sin(a) * r); g.rotate(a + dir * Math.PI / 2); g.fillText(ch, 0, 0); g.restore();
+  });
+  arc(cfg.printText.trim() || 'BLADE', -Math.PI / 2, 196, 1);   // model name on top
+  arc('SWISS MADE', Math.PI / 2, 200, -1);                       // bottom, reads left to right
   return canvasTex(c);
 }
 
@@ -446,6 +463,33 @@ function addDecal(target, pos, rot, size, mat, push) {
   d.userData = {base:0, zc:0, push};
   blade.add(d); layers.push(d);
   return d;
+}
+// country badge: domed epoxy cabochon with a thin brass bezel, set into the back of the handle
+const BADGE_R = 4.6, BADGE_H = .9;
+function addBadge(handle, y) {
+  blade.updateMatrixWorld(true);
+  const ray = new THREE.Raycaster(new THREE.Vector3(0, y, -60).applyMatrix4(blade.matrixWorld), new THREE.Vector3(0, 0, 1));
+  const hit = ray.intersectObject(handle)[0];
+  if (!hit) return;
+  const p = blade.worldToLocal(hit.point.clone()), n = hit.face.normal.clone().normalize();
+  if (n.z > 0) n.negate();   // outwards, towards the back
+  const R = (BADGE_R ** 2 + BADGE_H ** 2) / (2 * BADGE_H), th = Math.asin(BADGE_R / R);
+  const dome = new THREE.SphereGeometry(R, 64, 10, 0, Math.PI * 2, 0, th).rotateX(Math.PI / 2).translate(0, 0, -R * Math.cos(th));
+  const pos = dome.attributes.position, uv = dome.attributes.uv;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / (2 * BADGE_R) + .5, pos.getY(i) / (2 * BADGE_R) + .5);
+  const t = badgeTexture(cfg.badge); texs.push(t);
+  const lens = new THREE.Mesh(dome, new THREE.MeshPhysicalMaterial({map:t, roughness:.3, clearcoat:1, clearcoatRoughness:.03}));
+  const bezel = new THREE.Mesh(new THREE.TorusGeometry(BADGE_R, .28, 10, 64), new THREE.MeshPhysicalMaterial({color:'#c9a85a', metalness:.9, roughness:.3}));
+  const up = new THREE.Vector3(0, 1, 0).projectOnPlane(n).normalize(), right = up.clone().cross(n);
+  const badge = new THREE.Group();
+  badge.add(lens, bezel);
+  badge.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, n));
+  badge.position.copy(p).addScaledVector(n, -.2);   // sits slightly sunk into the wood
+  [lens, bezel].forEach(o => o.castShadow = true);
+  const holder = new THREE.Group();   // explode moves the holder, the badge keeps its place on the handle
+  holder.add(badge);
+  holder.userData = {base:0, zc:0, push:-22};
+  blade.add(holder); layers.push(holder);
 }
 const decalMat = opts => new THREE.MeshPhysicalMaterial({
   transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4, ...opts,
@@ -477,14 +521,17 @@ async function build() {
   layers = [];
 
   thickness = stack.reduce((s, l) => s + l.t, 0);
-  let z = thickness / 2;
+  let z = thickness / 2, core = null;
   stack.forEach(l => {
     const zb = z - l.t, zc = (z + zb) / 2;
     const backPhoto = l.outer && zc < 0 && !l.comp && !!tex[l.wood].back;
+    const t = backPhoto ? {...tex[l.wood], map:tex[l.wood].back, normal:tex[l.wood].backNormal} : tex[l.wood];
+    // faces get the finish, the cut edge (and sanded round over) stays matte end grain
     const mat = l.comp
       ? new THREE.MeshPhysicalMaterial({color:COMPOSITES[l.comp].color, roughness:.35, metalness:.3, clearcoat:.6})
-      : woodMat(backPhoto ? {...tex[l.wood], map:tex[l.wood].back} : tex[l.wood], cfg.finish, l.outer ? 1 : .5);
+      : [woodMat(t, cfg.finish, l.outer ? 1 : .5), edgeMat(t)];
     const m = new THREE.Mesh(plyGeom(BLADE_SHAPE, l.t, backPhoto ? 1 : zc < 0, l.outer ? .22 : 0), mat);
+    if (l.wood === cfg.core && !l.outer && Math.abs(zc) < .01) core = m;
     m.position.z = zb;
     m.castShadow = m.receiveShadow = true;
     m.userData = {base:zb, zc, push:0};
@@ -509,13 +556,13 @@ async function build() {
   }
 
   const hTex = tex[cfg.handleWood];
+  const hPhoto = hTex.handle ? {map:hTex.handle, normal:hTex.handleNormal} : hTex;   // real Palis handle wood
   HANDLE_GEOS.forEach((g, k) => {
     const front = g.boundingBox.max.z > 0;
-    const hm = woodMat(hTex, cfg.finish, .35);
-    hm.clearcoat *= .35;                 // handles are hand-sanded, less shiny than the face
-    hm.roughness = Math.max(hm.roughness, .66);
-    hm.envMapIntensity = .55;
-    if (WOODS[cfg.handleWood].handle) hm.color.set(WOODS[cfg.handleWood].handle);
+    const hm = woodMat(hPhoto, cfg.finish, hTex.handle ? .9 : .35);
+    hm.clearcoat *= .3;                  // handles are hand-sanded, less shiny than the face
+    hm.roughness = Math.max(hm.roughness, .64);
+    hm.envMapIntensity = .7;
     const m = new THREE.Mesh(g, hm);
     m.castShadow = m.receiveShadow = true;
     m.userData = {base:0, zc:0, push:front ? 22 : -22, keepGeo:true};
@@ -524,31 +571,37 @@ async function build() {
     if (front && (cfg.printText.trim() || cfg.printClass)) {
       const pc = PRINTS[cfg.printColor];
       const t = printTexture(); texs.push(t);
-      addDecal(m, new THREE.Vector3(0, bb.min.y + hy * .5, bb.max.z + 5), new THREE.Euler(0, 0, -Math.PI / 2), new THREE.Vector3(.62, .155, .2),
-        decalMat({map:t, color:pc.color, metalness:pc.metal, roughness:.35, clearcoat:.5}), 22);
+      addDecal(m, new THREE.Vector3(0, bb.min.y + hy * .5, bb.max.z + 5), new THREE.Euler(0, 0, -Math.PI / 2), new THREE.Vector3(.48, .12, .2),
+        decalMat({map:t, color:pc.color, metalness:pc.metal, roughness:.2, clearcoat:1, clearcoatRoughness:.06}), 22);   // glossy inlay
     }
-    if (!front && cfg.badge !== 'none') {
-      const t = badgeTexture(cfg.badge); texs.push(t);
-      addDecal(m, new THREE.Vector3(0, bb.min.y + hy * .27, bb.min.z - 5), new THREE.Euler(0, Math.PI, 0), new THREE.Vector3(.095, .095, .2),
-        decalMat({map:t, roughness:.3, clearcoat:.8, clearcoatRoughness:.15}), -22);
-    }
+    if (!front && cfg.badge !== 'none') addBadge(m, bb.min.y + hy * .27);
   });
 
-  // serial number stamped on the face veneer, moves with the front ply
+  // laser-engraved serial on the face veneer, moves with the front ply
   const st = serialTexture(); texs.push(st);
-  const serial = new THREE.Mesh(new THREE.PlaneGeometry(28, 3.5),
-    new THREE.MeshStandardMaterial({color:'#1a0f0b', alphaMap:st, transparent:true, opacity:.8, roughness:.55, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2}));
+  const engrave = () => new THREE.MeshStandardMaterial({color:'#24140d', alphaMap:st, transparent:true, opacity:.92, roughness:.8,
+    depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4});
+  const serial = new THREE.Mesh(new THREE.PlaneGeometry(26, 3.25), engrave());
   serial.position.set(13, HANDLE_TOP + 13, thickness / 2 + .02);
   serial.userData = {base:serial.position.z, zc:layers[0].userData.zc, push:0};
   blade.add(serial); layers.push(serial);
 
-  // turned medallion on the handle butt
+  // ...and burned into the pale core along the side of the handle, reading upwards
+  if (core) {
+    const ys = 22, side = OUTLINE.filter(p => p.x > 0 && Math.abs(p.y - ys) < 14).sort((a, b) => a.y - b.y);
+    const a = side[0], b = side[side.length - 1], tan = new THREE.Vector3(b.x - a.x, b.y - a.y, 0).normalize();
+    const nrm = new THREE.Vector3(tan.y, -tan.x, 0), x = a.x + (b.x - a.x) * (ys - a.y) / (b.y - a.y);
+    const rot = new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, new THREE.Vector3(0, 0, 1), nrm));
+    addDecal(core, new THREE.Vector3(x, ys, 0), rot, new THREE.Vector3(.27, .034, .03),
+      new THREE.MeshStandardMaterial({color:'#6b3a1a', alphaMap:st, transparent:true, opacity:.9, roughness:.85, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4}), 0);
+  }
+
+  // medallion on the handle butt, set flush into the end grain
   if (cfg.endcap !== 'none') {
-    const t = endcapTexture(); texs.push(t);
-    const ec = ENDCAPS[cfg.endcap];
-    const rim = new THREE.MeshPhysicalMaterial({color:ec.color, metalness:.9, roughness:.28, clearcoat:.4});
-    const face = new THREE.MeshPhysicalMaterial({color:ec.color, map:t, metalness:.55, roughness:.32, clearcoat:.6, envMapIntensity:1.4,
-      emissive:ec.color, emissiveMap:t, emissiveIntensity:.3});   // butt faces the floor, keep the rings readable
+    const ec = ENDCAPS[cfg.endcap], t = endcapTexture(ec); texs.push(t);
+    const rim = new THREE.MeshPhysicalMaterial({color:ec.color, metalness:.85, roughness:.3});
+    const face = new THREE.MeshPhysicalMaterial({map:t, roughness:.35, clearcoat:.8, clearcoatRoughness:.12,
+      emissive:'#ffffff', emissiveMap:t, emissiveIntensity:.12});   // butt faces the floor, keep the rings readable
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(5.6, 5.6, .3, 64), [rim, rim, face]);
     cap.position.set(0, BUTT_Y - .05, 0);
     cap.castShadow = true;
@@ -599,6 +652,7 @@ const VIEWS = {
   badge:  {label:null,         pos:[-.7, handleY + .1, -2.4],     target:[0, handleY - .1, 0]},
   butt:   {label:null,         pos:[.8, -BLADE_H / 200 - .55, .8], target:[0, -BLADE_H / 200 + .05, 0]},
   serial: {label:null,         pos:[.7, headY - .3, 2.4],         target:[.1, headY - .6, 0]},
+  side:   {label:null,         pos:[1.05, handleY - .12, .55],    target:[.14, handleY - .3, 0]},
   explode:{label:null,         pos:[5.2, 1.5, 3.6],               target:[0, .05, 0]},
 };
 camera.position.set(...VIEWS.front.pos);
@@ -635,11 +689,11 @@ const STEPS = [
   {key:'finish', title:'Finish', view:'hero', desc:'Natural oil look, satin or high gloss lacquer.',
     opts:Object.entries(FINISHES).map(([id, f]) => ({id, name:f.name, sw:`radial-gradient(circle at 35% 30%,rgba(255,255,255,${f.clearcoat * .9}),transparent 45%),${woodSw('palisander')}`}))},
   {key:'handleWood', title:'Handle wood', view:'handle', desc:'Flared handle from your CAD model.',
-    opts:Object.keys(PRICES.handleWood).map(id => ({id, name:WOODS[id].name, sw:woodSw(id)}))},
+    opts:Object.keys(PRICES.handleWood).map(id => ({id, name:WOODS[id].name, sw:WOODS[id].photo ? `url(textures/${id}_handle_col.jpg) center/150%` : woodSw(id)}))},
   {key:'print', title:'Handle print', view:'print', custom:true},
   {key:'badge', title:'Handle badge', view:'badge', desc:'Small round badge on the back of the handle.',
     opts:Object.entries(BADGES).map(([id, name]) => ({id, name, sw:BADGE_SW[id]}))},
-  {key:'endcap', title:'End cap', view:'butt', desc:'Turned metal medallion on the butt of the handle.',
+  {key:'endcap', title:'End cap', view:'butt', desc:'Enamel medallion with metal rim, set into the butt of the handle.',
     opts:Object.entries(ENDCAPS).map(([id, e]) => ({id, name:e.name, sw:e.color ? `repeating-radial-gradient(circle,${e.color} 0 3px,#8a8a8a 4px,${e.color} 5px 7px)` : woodSw(cfg.handleWood)}))},
   {key:'rubbers', title:'Preview with rubbers', view:'hero', desc:'Visual preview only, rubbers are not included in the price.',
     opts:[{id:'off', name:'Blade only', txt:'-'}, {id:'on', name:'With rubbers', sw:'linear-gradient(90deg,#c0142e 50%,#141414 50%)'}], noPrice:true},
@@ -791,7 +845,7 @@ function loop() {
 /* ------------------------------------------------------------------ */
 resize();
 (async () => {
-  try { await document.fonts.load('800 40px Montserrat'); } catch (e) {}
+  try { await Promise.all(['800 40px Montserrat', '40px Michroma', '40px "Share Tech Mono"'].map(f => document.fonts.load(f))); } catch (e) {}
   await build();
   refreshHeads();
   // deep links: #hero, #plies, #handle, #explode ...

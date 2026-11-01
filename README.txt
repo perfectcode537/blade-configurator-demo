@@ -21,19 +21,22 @@ WHAT IS IN THE DEMO
   wenge, ash. Scans: Poly Haven, CC0 licence (free for commercial use).
   New wood = add a scan or photo of the real veneer with tools/prep_textures.py
 - Palisander front and back are made from the original full-size Palis product photos
-  (tools/prep_photo_wood.py maps the photo onto the CAD outline), 4096 px, real pores and fibres
-- Sanded round edge on the face veneers
+  (tools/prep_photo_wood.py maps the photo onto the CAD outline), 4096 px, real pores and fibres;
+  normal maps from the photo pores (tools/photo_normal.py)
+- Handle wood taken from the real Palis handle photo (tools/prep_handle_wood.py), matte hand-sanded
+- Sanded round edge on the face veneers, matte end-grain ply edges
 - Natural / satin / gloss finish (clearcoat)
-- Handle wood + handle print (model name + class, white / gold / silver) as a decal
-- Country badge on the back of the handle, serial number stamped on the face,
-  turned metal medallion on the handle butt (silver / gold / none)
+- Handle wood + handle print (model name + class) on a glossy black inlay plate
+- Domed country badge with brass bezel on the back of the handle
+- Laser-engraved serial number on the face and on the ply edge of the handle
+- White enamel medallion with black rings on the handle butt (silver / gold rim / none)
 - Rubber preview, live price and estimated weight (wood densities x real volume)
 - Save HD render: PNG up to 3600 px on white background, like shop product photos
 - Add to cart summary (in the real shop this goes to the WooCommerce cart)
 
 SHAREABLE DESIGN LINKS
 index.html?outer=ebony&handleWood=wenge&finish=gloss&printText=NOVA&printClass=ALL%2B&printColor=gold#hero
-Views after #: front, hero, back, plies, handle, badge, butt, serial, explode
+Views after #: front, hero, back, plies, handle, badge, butt, serial, side, explode
 
 REBUILD model.js FROM A NEW CAD EXPORT
 python ../tools/prep_model.py ../files/Flared.obj model.js
