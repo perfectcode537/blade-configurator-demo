@@ -20,13 +20,15 @@ WHAT IS IN THE DEMO
   palisander, ebony, walnut, limba, koto, hinoki, ayous, kiri, wenge, ash
 - Natural / satin / gloss finish (clearcoat)
 - Handle wood + handle print (model name + class, white / gold / silver) as a decal
+- Country badge on the back of the handle, serial number stamped on the face,
+  turned metal medallion on the handle butt (silver / gold / none)
 - Rubber preview, live price and estimated weight (wood densities x real volume)
 - Save HD render: PNG up to 3600 px on white background, like shop product photos
 - Add to cart summary (in the real shop this goes to the WooCommerce cart)
 
 SHAREABLE DESIGN LINKS
 index.html?outer=ebony&handleWood=wenge&finish=gloss&printText=NOVA&printClass=ALL%2B&printColor=gold#hero
-Views after #: front, hero, back, plies, handle, explode
+Views after #: front, hero, back, plies, handle, badge, butt, serial, explode
 
 REBUILD model.js FROM A NEW CAD EXPORT
 python ../tools/prep_model.py ../files/Flared.obj model.js

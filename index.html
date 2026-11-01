@@ -203,11 +203,20 @@ const PRICES = {
   finish:{natural:0, satin:8, gloss:15},
   handleWood:{palisander:0, wenge:6, walnut:0, ash:0},
   printColor:{white:0, gold:6, silver:6},
+  badge:{none:0, brazil:0, switzerland:0, italy:0, germany:0, japan:0},
+  endcap:{silver:0, gold:5, none:0},
 };
+const BADGES = {none:'No badge', brazil:'Brazil', switzerland:'Switzerland', italy:'Italy', germany:'Germany', japan:'Japan'};
+const BADGE_SW = {
+  none:'#3a2a24', brazil:'radial-gradient(circle,#1d3f8f 0 22%,#f7d117 23% 45%,#169b3a 46%)', switzerland:'radial-gradient(circle,#fff 0 18%,#d52b1e 19%)',
+  italy:'linear-gradient(90deg,#009246 33%,#fff 33% 66%,#ce2b37 66%)', germany:'linear-gradient(#111 33%,#dd0000 33% 66%,#ffce00 66%)', japan:'radial-gradient(circle,#bc002d 0 30%,#fff 31%)',
+};
+const ENDCAPS = {silver:{name:'Silver', color:'#e6e6e6'}, gold:{name:'Gold', color:'#d9b25a'}, none:{name:'Wood only', color:null}};
+const SERIAL = 'SO70' + String(25148 + Math.floor(Math.random() * 7000)).padStart(5, '0');
 
 const cfg = {
   outer:'palisander', composite:'none', core:'ayous', finish:'satin', handleWood:'palisander',
-  printText:'PALIS', printClass:'OFF', printColor:'white', rubbers:'off',
+  printText:'PALIS', printClass:'OFF', printColor:'white', badge:'brazil', endcap:'silver', rubbers:'off',
 };
 // shareable designs: ?outer=ebony&composite=carbon&printText=MAX ...
 {
@@ -393,6 +402,7 @@ const HANDLE_GEOS = MODEL.handles.map((h, k) => {
   g.computeBoundingBox();
   return g;
 });
+const BUTT_Y = Math.min(...HANDLE_GEOS.map(g => g.boundingBox.min.y));
 const HANDLE_VOL = MODEL.handles.reduce((s, h) => {
   const a = h.position; let v = 0;
   for (let i = 0; i < a.length; i += 9) {
@@ -420,16 +430,85 @@ function printTexture() {
   g.fillStyle = '#ff7a1a';
   g.font = '800 92px Montserrat, Arial, sans-serif';
   g.fillText(cls, x + w1 + gap, 128);
+  return canvasTex(c);
+}
+function canvasTex(c) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return t;
 }
 
+// round country badge on the back of the handle (like the Brazil flag on Palis)
+function badgeTexture(id) {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.save(); g.beginPath(); g.arc(128, 128, 112, 0, Math.PI * 2); g.clip();
+  const band = (cols, vertical) => cols.forEach((col, i) => {
+    g.fillStyle = col;
+    vertical ? g.fillRect(i * 256 / cols.length, 0, 256 / cols.length + 1, 256) : g.fillRect(0, i * 256 / cols.length, 256, 256 / cols.length + 1);
+  });
+  if (id === 'brazil') {
+    g.fillStyle = '#169b3a'; g.fillRect(0, 0, 256, 256);
+    g.fillStyle = '#f7d117'; g.beginPath(); g.moveTo(128, 46); g.lineTo(226, 128); g.lineTo(128, 210); g.lineTo(30, 128); g.fill();
+    g.fillStyle = '#1d3f8f'; g.beginPath(); g.arc(128, 128, 46, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#ffffff'; g.lineWidth = 9; g.beginPath(); g.arc(150, 200, 92, Math.PI * 1.13, Math.PI * 1.55); g.stroke();
+  } else if (id === 'switzerland') {
+    g.fillStyle = '#d52b1e'; g.fillRect(0, 0, 256, 256);
+    g.fillStyle = '#ffffff'; g.fillRect(108, 58, 40, 140); g.fillRect(58, 108, 140, 40);
+  } else if (id === 'italy') band(['#009246', '#ffffff', '#ce2b37'], true);
+  else if (id === 'germany') band(['#111111', '#dd0000', '#ffce00'], false);
+  else if (id === 'japan') {
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 256);
+    g.fillStyle = '#bc002d'; g.beginPath(); g.arc(128, 128, 52, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+  g.strokeStyle = '#e9d9a6'; g.lineWidth = 14; g.beginPath(); g.arc(128, 128, 116, 0, Math.PI * 2); g.stroke();
+  return canvasTex(c);
+}
+
+// small stamped serial number on the face, just above the handle
+function serialTexture() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 64;
+  const g = c.getContext('2d');
+  g.textBaseline = 'middle'; g.textAlign = 'center';
+  if ('letterSpacing' in g) g.letterSpacing = '4px';
+  g.font = '500 44px "Courier New", monospace';
+  g.fillStyle = '#ffffff';
+  g.fillText(SERIAL, 256, 34);
+  return canvasTex(c);
+}
+
+// turned medallion on the butt of the handle
+function endcapTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  for (let r = 128; r > 0; r -= 2) {
+    const ring = r > 112 ? .55 : r > 96 ? .9 : r > 88 ? .5 : r > 60 ? .95 - (r % 8 < 2 ? .25 : 0) : r > 52 ? .55 : r > 22 ? .85 - (r % 6 < 2 ? .2 : 0) : .7;
+    const v = Math.round(255 * ring);
+    g.fillStyle = `rgb(${v},${v},${v})`;
+    g.beginPath(); g.arc(128, 128, r, 0, Math.PI * 2); g.fill();
+  }
+  return canvasTex(c);
+}
+
+function addDecal(target, pos, rot, size, mat, push) {
+  blade.updateMatrixWorld(true);
+  const dg = new DecalGeometry(target, pos.applyMatrix4(blade.matrixWorld), rot, size);
+  dg.applyMatrix4(blade.matrixWorld.clone().invert());
+  const d = new THREE.Mesh(dg, mat);
+  d.userData = {base:0, zc:0, push};
+  blade.add(d); layers.push(d);
+  return d;
+}
+const decalMat = opts => new THREE.MeshPhysicalMaterial({
+  transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4, ...opts,
+});
+
 /* ------------------------------------------------------------------ */
 /*  Build the blade from the current configuration                     */
 /* ------------------------------------------------------------------ */
-let layers = [], thickness = 0, buildId = 0, printTex = null;
+let layers = [], thickness = 0, buildId = 0, texs = [];
 const busyEl = document.getElementById('busy');
 async function build() {
   const id = ++buildId;
@@ -448,7 +527,7 @@ async function build() {
 
   blade.traverse(o => { if (o.isMesh) { o.material.dispose(); if (!o.userData.keepGeo) o.geometry.dispose(); } });
   blade.clear();
-  if (printTex) { printTex.dispose(); printTex = null; }
+  texs.forEach(t => t.dispose()); texs = [];
   layers = [];
 
   thickness = stack.reduce((s, l) => s + l.t, 0);
@@ -493,23 +572,41 @@ async function build() {
     m.castShadow = m.receiveShadow = true;
     m.userData = {base:0, zc:0, push:front ? 22 : -22, keepGeo:true};
     blade.add(m); layers.push(m);
+    const bb = g.boundingBox, hy = bb.max.y - bb.min.y;
     if (front && (cfg.printText.trim() || cfg.printClass)) {
-      blade.updateMatrixWorld(true);
-      const bb = g.boundingBox;
-      const pos = new THREE.Vector3(0, bb.min.y + (bb.max.y - bb.min.y) * .5, bb.max.z + 5).applyMatrix4(blade.matrixWorld);
-      const dg = new DecalGeometry(m, pos, new THREE.Euler(0, 0, -Math.PI / 2), new THREE.Vector3(.62, .155, .2));
-      dg.applyMatrix4(blade.matrixWorld.clone().invert());
-      printTex = printTexture();
       const pc = PRINTS[cfg.printColor];
-      const dm = new THREE.MeshPhysicalMaterial({
-        map:printTex, color:pc.color, metalness:pc.metal, roughness:.35, clearcoat:.5,
-        transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4,
-      });
-      const d = new THREE.Mesh(dg, dm);
-      d.userData = {base:0, zc:0, push:22};
-      blade.add(d); layers.push(d);
+      const t = printTexture(); texs.push(t);
+      addDecal(m, new THREE.Vector3(0, bb.min.y + hy * .5, bb.max.z + 5), new THREE.Euler(0, 0, -Math.PI / 2), new THREE.Vector3(.62, .155, .2),
+        decalMat({map:t, color:pc.color, metalness:pc.metal, roughness:.35, clearcoat:.5}), 22);
+    }
+    if (!front && cfg.badge !== 'none') {
+      const t = badgeTexture(cfg.badge); texs.push(t);
+      addDecal(m, new THREE.Vector3(0, bb.min.y + hy * .27, bb.min.z - 5), new THREE.Euler(0, Math.PI, 0), new THREE.Vector3(.095, .095, .2),
+        decalMat({map:t, roughness:.3, clearcoat:.8, clearcoatRoughness:.15}), -22);
     }
   });
+
+  // serial number stamped on the face veneer, moves with the front ply
+  const st = serialTexture(); texs.push(st);
+  const serial = new THREE.Mesh(new THREE.PlaneGeometry(28, 3.5),
+    new THREE.MeshStandardMaterial({color:'#1a0f0b', alphaMap:st, transparent:true, opacity:.8, roughness:.55, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2}));
+  serial.position.set(13, HANDLE_TOP + 13, thickness / 2 + .02);
+  serial.userData = {base:serial.position.z, zc:layers[0].userData.zc, push:0};
+  blade.add(serial); layers.push(serial);
+
+  // turned medallion on the handle butt
+  if (cfg.endcap !== 'none') {
+    const t = endcapTexture(); texs.push(t);
+    const ec = ENDCAPS[cfg.endcap];
+    const rim = new THREE.MeshPhysicalMaterial({color:ec.color, metalness:.9, roughness:.28, clearcoat:.4});
+    const face = new THREE.MeshPhysicalMaterial({color:ec.color, map:t, metalness:.55, roughness:.32, clearcoat:.6, envMapIntensity:1.4,
+      emissive:ec.color, emissiveMap:t, emissiveIntensity:.3});   // butt faces the floor, keep the rings readable
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(5.6, 5.6, .3, 64), [rim, rim, face]);
+    cap.position.set(0, BUTT_Y - .05, 0);
+    cap.castShadow = true;
+    cap.userData = {base:0, zc:0, push:0};
+    blade.add(cap); layers.push(cap);
+  }
   updateSummary();
 }
 
@@ -518,7 +615,7 @@ async function build() {
 /* ------------------------------------------------------------------ */
 function calcPrice() {
   let p = PRICES.base;
-  ['outer', 'composite', 'core', 'finish', 'handleWood', 'printColor'].forEach(k => p += PRICES[k][cfg[k]] || 0);
+  ['outer', 'composite', 'core', 'finish', 'handleWood', 'printColor', 'badge', 'endcap'].forEach(k => p += PRICES[k][cfg[k]] || 0);
   return p;
 }
 function calcWeight() {
@@ -551,6 +648,9 @@ const VIEWS = {
   plies:  {label:'Ply detail', pos:[1.3, headY + .12, .2],        target:[.75, headY, 0]},
   handle: {label:'Handle',     pos:[.95, handleY + .25, 1.55],    target:[0, handleY, 0]},
   print:  {label:null,         pos:[.3, handleY + .05, 1.2],      target:[0, handleY, 0]},
+  badge:  {label:null,         pos:[-.7, handleY + .1, -2.4],     target:[0, handleY - .1, 0]},
+  butt:   {label:null,         pos:[.8, -BLADE_H / 200 - .55, .8], target:[0, -BLADE_H / 200 + .05, 0]},
+  serial: {label:null,         pos:[.7, headY - .3, 2.4],         target:[.1, headY - .6, 0]},
   explode:{label:null,         pos:[5.2, 1.5, 3.6],               target:[0, .05, 0]},
 };
 camera.position.set(...VIEWS.front.pos);
@@ -589,6 +689,10 @@ const STEPS = [
   {key:'handleWood', title:'Handle wood', view:'handle', desc:'Flared handle from your CAD model.',
     opts:Object.keys(PRICES.handleWood).map(id => ({id, name:WOODS[id].name, sw:woodSw(id)}))},
   {key:'print', title:'Handle print', view:'print', custom:true},
+  {key:'badge', title:'Handle badge', view:'badge', desc:'Small round badge on the back of the handle.',
+    opts:Object.entries(BADGES).map(([id, name]) => ({id, name, sw:BADGE_SW[id]}))},
+  {key:'endcap', title:'End cap', view:'butt', desc:'Turned metal medallion on the butt of the handle.',
+    opts:Object.entries(ENDCAPS).map(([id, e]) => ({id, name:e.name, sw:e.color ? `repeating-radial-gradient(circle,${e.color} 0 3px,#8a8a8a 4px,${e.color} 5px 7px)` : woodSw(cfg.handleWood)}))},
   {key:'rubbers', title:'Preview with rubbers', view:'hero', desc:'Visual preview only, rubbers are not included in the price.',
     opts:[{id:'off', name:'Blade only', txt:'-'}, {id:'on', name:'With rubbers', sw:'linear-gradient(90deg,#c0142e 50%,#141414 50%)'}], noPrice:true},
 ];
@@ -691,6 +795,7 @@ document.getElementById('bCart').onclick = () => {
     ['Face veneer', WOODS[cfg.outer].name], ['Composite', COMPOSITES[cfg.composite].name], ['Core', WOODS[cfg.core].name],
     ['Finish', FINISHES[cfg.finish].name], ['Handle', `Flared, ${WOODS[cfg.handleWood].name}`],
     ['Handle print', `${cfg.printText} ${cfg.printClass} (${PRINTS[cfg.printColor].name})`],
+    ['Badge / end cap', `${BADGES[cfg.badge]}, ${ENDCAPS[cfg.endcap].name}`], ['Serial no.', SERIAL],
     ['Est. weight', Math.round(calcWeight()) + ' g'], ['Price', fmt(calcPrice())],
   ];
   document.getElementById('cartTable').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1].replace(/</g, '&lt;')}</td></tr>`).join('');
