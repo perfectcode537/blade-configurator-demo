@@ -464,7 +464,7 @@ async function build() {
   clearTimeout(timer); busyEl.classList.remove('show');
   if (id !== buildId) return;   // a newer change is already on the way
 
-  blade.traverse(o => { if (o.isMesh) { o.material.dispose(); if (!o.userData.keepGeo) o.geometry.dispose(); } });
+  blade.traverse(o => { if (o.isMesh) { [].concat(o.material).forEach(m => m.dispose()); if (!o.userData.keepGeo) o.geometry.dispose(); } });
   blade.clear();
   texs.forEach(t => t.dispose()); texs = [];
   layers = [];
