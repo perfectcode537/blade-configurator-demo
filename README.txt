@@ -20,8 +20,8 @@ WHAT IS IN THE DEMO
   to the real product photos: palisander, ebony, walnut, limba, koto, hinoki, ayous, kiri,
   wenge, ash. Scans: Poly Haven, CC0 licence (free for commercial use).
   New wood = add a scan or photo of the real veneer with tools/prep_textures.py
-- Palisander front and back are made from the real Palis product photos
-  (tools/prep_photo_wood.py maps the photo onto the CAD outline), fine fibres from a scan
+- Palisander front and back are made from the original full-size Palis product photos
+  (tools/prep_photo_wood.py maps the photo onto the CAD outline), 4096 px, real pores and fibres
 - Sanded round edge on the face veneers
 - Natural / satin / gloss finish (clearcoat)
 - Handle wood + handle print (model name + class, white / gold / silver) as a decal
