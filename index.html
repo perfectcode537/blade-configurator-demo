@@ -113,7 +113,7 @@
   <section class="stage" id="stage">
     <canvas id="c"></canvas>
     <div class="views" id="views"></div>
-    <div class="badge">Model: Flared (Fusion 360 CAD)<br>Real-time PBR rendering</div>
+    <div class="badge">Model: Flared (Fusion 360 CAD)<br>Scanned real veneers, PBR</div>
     <div class="tools">
       <button class="pill" id="bExplode">Show ply layers</button>
       <button class="pill" id="bRotate">Auto rotate</button>
@@ -165,18 +165,18 @@ import MODEL from './model.js';
 /*  Product data (in the WordPress plugin this comes from the admin)   */
 /* ------------------------------------------------------------------ */
 const EUR = '€';
-// c = [light, mid, dark]; f1 broad streaks, f2 fine streaks, lf thin lines
+// colour + normal maps come from real veneer scans (tools/prep_textures.py), handle = tint for hand-sanded handles
 const WOODS = {
-  palisander:{name:'Palisander', c:['#9a644c', '#5c3429', '#22130e'], f1:28, f2:110, lf:70,  a:.55, b:.5,  cl:.55, fib:.16, warp:.012, pores:.3,  density:.85, seed:2.2},
-  ebony:     {name:'Ebony',      c:['#6a4f3d', '#2e2018', '#0b0705'], f1:24, f2:100, lf:60,  a:.6,  b:.45, cl:.6,  fib:.14, warp:.014, pores:.15, density:1.0, seed:9.2},
-  walnut:    {name:'Walnut',     c:['#a87752', '#6e472c', '#3a2315'], f1:18, f2:80,  lf:48,  a:.55, b:.45, cl:.45, fib:.18, warp:.02,  pores:.45, density:.63, seed:2.9},
-  limba:     {name:'Limba',      c:['#e6c891', '#c99e62', '#946a37'], f1:18, f2:85,  lf:55,  a:.5,  b:.4,  cl:.38, fib:.16, warp:.016, pores:.2,  density:.56, seed:1.3},
-  koto:      {name:'Koto',       c:['#efdba8', '#d9b97a', '#ad8850'], f1:24, f2:110, lf:80,  a:.45, b:.4,  cl:.32, fib:.14, warp:.01,  pores:.3,  density:.60, seed:4.1},
-  hinoki:    {name:'Hinoki',     c:['#f4dfba', '#e5c597', '#c99f6d'], f1:30, f2:160, lf:130, a:.4,  b:.35, cl:.34, fib:.1,  warp:.006, pores:0,   density:.41, seed:7.7},
-  ayous:     {name:'Ayous',      c:['#f3e1c3', '#e5cba3', '#cdab7e'], f1:20, f2:90,  lf:60,  a:.4,  b:.35, cl:.25, fib:.14, warp:.012, pores:.2,  density:.38, seed:5.5},
-  kiri:      {name:'Kiri',       c:['#f6e9d1', '#e7d4b0', '#d0b68b'], f1:16, f2:70,  lf:40,  a:.35, b:.35, cl:.22, fib:.14, warp:.012, pores:.25, density:.29, seed:3.3},
-  wenge:     {name:'Wenge',      c:['#71503a', '#3b281c', '#130c08'], f1:20, f2:90,  lf:55,  a:.55, b:.4,  cl:.75, fib:.2,  warp:.012, pores:.3,  density:.85, seed:8.4},
-  ash:       {name:'White Ash',  c:['#e8d2a6', '#cba875', '#9c7646'], f1:14, f2:60,  lf:32,  a:.5,  b:.4,  cl:.55, fib:.18, warp:.02,  pores:.35, density:.68, seed:6.6},
+  palisander:{name:'Palisander', density:.85, handle:'#8c8590'},
+  ebony:     {name:'Ebony',      density:1.0},
+  walnut:    {name:'Walnut',     density:.63},
+  limba:     {name:'Limba',      density:.56},
+  koto:      {name:'Koto',       density:.60},
+  hinoki:    {name:'Hinoki',     density:.41},
+  ayous:     {name:'Ayous',      density:.38},
+  kiri:      {name:'Kiri',       density:.29},
+  wenge:     {name:'Wenge',      density:.85},
+  ash:       {name:'White Ash',  density:.68},
 };
 const COMPOSITES = {
   none:   {name:'All wood'},
@@ -216,7 +216,7 @@ const SERIAL = 'SO70' + String(25148 + Math.floor(Math.random() * 7000)).padStar
 
 const cfg = {
   outer:'palisander', composite:'none', core:'ayous', finish:'satin', handleWood:'palisander',
-  printText:'PALIS', printClass:'OFF', printColor:'white', badge:'brazil', endcap:'silver', rubbers:'off',
+  printText:'PALIS', printClass:'OFF', printColor:'white', badge:'switzerland', endcap:'silver', rubbers:'off',
 };
 // shareable designs: ?outer=ebony&composite=carbon&printText=MAX ...
 {
@@ -276,94 +276,30 @@ blade.position.y = -BLADE_H / 200;    // centre the blade
 scene.add(blade);
 
 /* ------------------------------------------------------------------ */
-/*  Wood textures, generated in background workers                     */
+/*  Wood textures: scanned veneers, colour + normal map                */
 /* ------------------------------------------------------------------ */
-function woodWorker() {
-  const P = new Uint8Array(512);
-  { const p = [...Array(256).keys()]; let s = 1337; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-    for (let i = 255; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
-    for (let i = 0; i < 512; i++) P[i] = p[i & 255]; }
-  function noise(x, y) {
-    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, X = xi & 255, Y = yi & 255;
-    const a = P[P[X] + Y], b = P[P[X + 1] + Y], c = P[P[X] + Y + 1], d = P[P[X + 1] + Y + 1];
-    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
-    return (a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v) / 255;
-  }
-  function fbm(x, y, o) { let s = 0, a = .5, f = 1, n = 0; for (let i = 0; i < o; i++) { s += a * noise(x * f, y * f); n += a; a *= .5; f *= 2; } return s / n; }
-  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
-  self.onmessage = e => {
-    const {key, sp, size} = e.data;
-    const col = new Uint8Array(size * size * 4), bump = new Uint8Array(size * size * 4);
-    const L = hex(sp.c[0]), M = hex(sp.c[1]), D = hex(sp.c[2]), sd = sp.seed * 17.3;
-    for (let y = 0; y < size; y++) {
-      const v = y / size;
-      for (let x = 0; x < size; x++) {
-        const u = x / size;
-        const wu = u + (fbm(u * 2 + sd, v * .6, 3) - .5) * sp.warp + (noise(u * 9 + sd, v * 2.2) - .5) * sp.warp * .25;
-        const broad = fbm(wu * sp.f1 + sd, v * .08 + sd, 3);
-        const fine = noise(wu * sp.f2 + sd * 3, v * .15);
-        const rr = noise(wu * sp.lf + sd * 5, v * .25);
-        const ridge = Math.pow(1 - Math.abs(2 * rr - 1), 10);
-        const fiber = noise(u * size * .5, v * 6 + sd) - .5;
-        let t = .5 + (broad - .5) * sp.a * 3 + (fine - .5) * sp.b + ridge * sp.cl + fiber * sp.fib;
-        if (sp.pores) { const p = noise(u * size * .3 + sd, v * size * .02); if (p > .82) t += (p - .82) * 5 * sp.pores; }
-        t = t < 0 ? 0 : t > 1 ? 1 : t;
-        const i = (y * size + x) * 4;
-        if (t < .5) { const k = t * 2; col[i] = L[0] + (M[0] - L[0]) * k; col[i + 1] = L[1] + (M[1] - L[1]) * k; col[i + 2] = L[2] + (M[2] - L[2]) * k; }
-        else { const k = t * 2 - 1; col[i] = M[0] + (D[0] - M[0]) * k; col[i + 1] = M[1] + (D[1] - M[1]) * k; col[i + 2] = M[2] + (D[2] - M[2]) * k; }
-        col[i + 3] = 255;
-        const g = Math.max(0, Math.min(255, 255 * (.7 - ridge * .45 - Math.max(0, fiber) * .5 - (fine - .5) * .15)));
-        bump[i] = bump[i + 1] = bump[i + 2] = g; bump[i + 3] = 255;
-      }
-    }
-    self.postMessage({key, col, bump}, [col.buffer, bump.buffer]);
-  };
-}
-const workerURL = URL.createObjectURL(new Blob([`(${woodWorker})()`], {type:'text/javascript'}));
-const workers = [], waiting = {};
-for (let i = 0; i < Math.min(4, Math.max(2, (navigator.hardwareConcurrency || 2) - 1)); i++) {
-  const w = new Worker(workerURL);
-  w.onmessage = e => { w.busy = false; waiting[e.data.key](e.data); pump(); };
-  workers.push(w);
-}
-const jobs = [];
-function pump() {
-  for (const w of workers) {
-    if (w.busy || !jobs.length) continue;
-    const j = jobs.shift();
-    w.busy = true;
-    w.postMessage(j);
-  }
-}
+const loader = new THREE.TextureLoader();
 const texCache = {};
-function dataTex(arr, size, srgb) {
-  const t = new THREE.DataTexture(arr, size, size, THREE.RGBAFormat);
-  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.magFilter = THREE.LinearFilter;
-  t.minFilter = THREE.LinearMipmapLinearFilter;
-  t.generateMipmaps = true;
-  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  t.needsUpdate = true;
-  return t;
+function loadTex(url, srgb) {
+  return new Promise((res, rej) => loader.load(url, t => {
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping;   // no visible seams on the handle sides
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    res(t);
+  }, undefined, rej));
 }
-function woodTex(id, size = 1024, urgent = true) {
-  const key = id + '@' + size;
-  if (!texCache[key]) {
-    texCache[key] = new Promise(res => {
-      waiting[key] = d => res({map:dataTex(d.col, size, true), bump:dataTex(d.bump, size, false)});
-      const job = {key, sp:WOODS[id], size};
-      urgent ? jobs.unshift(job) : jobs.push(job);
-      pump();
-    });
+function woodTex(id) {
+  if (!texCache[id]) {
+    texCache[id] = Promise.all([loadTex(`textures/${id}_col.jpg`, true), loadTex(`textures/${id}_nrm.jpg`, false)])
+      .then(([map, normal]) => ({map, normal}));
   }
-  return texCache[key];
+  return texCache[id];
 }
 
 function woodMat(tex, finish, bumpK = 1) {
-  const f = FINISHES[finish];
+  const f = FINISHES[finish], k = f.bump * bumpK;
   return new THREE.MeshPhysicalMaterial({
-    map:tex.map, bumpMap:tex.bump, bumpScale:.8 * f.bump * bumpK,
+    map:tex.map, normalMap:tex.normal, normalScale:new THREE.Vector2(k, k),
     roughness:f.roughness, clearcoat:f.clearcoat, clearcoatRoughness:f.ccr,
   });
 }
@@ -378,8 +314,11 @@ const RUBBER_SHAPE = new THREE.Shape(OUTLINE.filter(p => p.y > HANDLE_TOP + 4).m
 const BLADE_AREA = (() => { let a = 0; OUTLINE.forEach((p, i) => { const q = OUTLINE[(i + 1) % OUTLINE.length]; a += p.x * q.y - q.x * p.y; }); return Math.abs(a) / 2 / 100; })(); // cm2
 const UVS = 270; // mm covered by one texture tile
 
-function plyGeom(shape, depth, mirror) {
-  const g = new THREE.ExtrudeGeometry(shape, {depth, bevelEnabled:false, curveSegments:1, steps:1});
+// round = sanded edge radius (mm) on the face veneers, like a finished blade
+function plyGeom(shape, depth, mirror, round = 0) {
+  const g = round
+    ? new THREE.ExtrudeGeometry(shape, {depth:depth - 2 * round, bevelEnabled:true, bevelThickness:round, bevelSize:round, bevelOffset:-round, bevelSegments:3, curveSegments:1, steps:1}).translate(0, 0, round)
+    : new THREE.ExtrudeGeometry(shape, {depth, bevelEnabled:false, curveSegments:1, steps:1});
   const p = g.attributes.position, uv = g.attributes.uv;
   for (let i = 0; i < p.count; i++) {
     let u = p.getX(i) / UVS + .5;
@@ -518,7 +457,7 @@ async function build() {
   else half.push({wood:'ayous', t:.6});
   const stack = [...half, {wood:cfg.core, t:comp ? 3.2 : 3.6}, ...half.slice().reverse()];
 
-  const need = {[cfg.outer + '@2048']:woodTex(cfg.outer, 2048), ['ayous@1024']:woodTex('ayous'), [cfg.core + '@1024']:woodTex(cfg.core), [cfg.handleWood + '@1024']:woodTex(cfg.handleWood)};
+  const need = Object.fromEntries([cfg.outer, 'ayous', cfg.core, cfg.handleWood].map(w => [w, woodTex(w)]));
   const t0 = performance.now();
   const timer = setTimeout(() => busyEl.classList.add('show'), 120);
   const tex = Object.fromEntries(await Promise.all(Object.entries(need).map(async ([k, p]) => [k, await p])));
@@ -536,8 +475,8 @@ async function build() {
     const zb = z - l.t, zc = (z + zb) / 2;
     const mat = l.comp
       ? new THREE.MeshPhysicalMaterial({color:COMPOSITES[l.comp].color, roughness:.35, metalness:.3, clearcoat:.6})
-      : woodMat(tex[l.wood + (l.outer ? '@2048' : '@1024')], cfg.finish, l.outer ? 1 : .5);
-    const m = new THREE.Mesh(plyGeom(BLADE_SHAPE, l.t, zc < 0), mat);
+      : woodMat(tex[l.wood], cfg.finish, l.outer ? 1 : .5);
+    const m = new THREE.Mesh(plyGeom(BLADE_SHAPE, l.t, zc < 0, l.outer ? .22 : 0), mat);
     m.position.z = zb;
     m.castShadow = m.receiveShadow = true;
     m.userData = {base:zb, zc, push:0};
@@ -561,13 +500,14 @@ async function build() {
     });
   }
 
-  const hTex = tex[cfg.handleWood + '@1024'];
+  const hTex = tex[cfg.handleWood];
   HANDLE_GEOS.forEach((g, k) => {
     const front = g.boundingBox.max.z > 0;
     const hm = woodMat(hTex, cfg.finish, .35);
     hm.clearcoat *= .35;                 // handles are hand-sanded, less shiny than the face
     hm.roughness = Math.max(hm.roughness, .66);
     hm.envMapIntensity = .55;
+    if (WOODS[cfg.handleWood].handle) hm.color.set(WOODS[cfg.handleWood].handle);
     const m = new THREE.Mesh(g, hm);
     m.castShadow = m.receiveShadow = true;
     m.userData = {base:0, zc:0, push:front ? 22 : -22, keepGeo:true};
@@ -676,7 +616,7 @@ controls.addEventListener('start', () => { tween = null; document.querySelectorA
 /* ------------------------------------------------------------------ */
 /*  Configurator panel                                                 */
 /* ------------------------------------------------------------------ */
-const woodSw = id => { const c = WOODS[id].c; return `repeating-linear-gradient(90deg,${c[1]} 0 4px,${c[2]} 5px 6px,${c[0]} 7px 9px,${c[1]} 10px 13px)`; };
+const woodSw = id => `url(textures/${id}_col.jpg) center/300% no-repeat`;
 const STEPS = [
   {key:'outer', title:'Face veneer', view:'front', desc:'The face veneer gives the blade its look and feel.',
     opts:Object.keys(PRICES.outer).map(id => ({id, name:WOODS[id].name, sw:woodSw(id)}))},
@@ -854,8 +794,7 @@ resize();
   loop();
   document.getElementById('loader').classList.add('hide');
   // warm up the other woods in the background so changes are instant
-  Object.keys(PRICES.outer).forEach(id => woodTex(id, 2048, false));
-  ['kiri', 'limba', 'wenge', 'walnut', 'ash'].forEach(id => woodTex(id, 1024, false));
+  Object.keys(WOODS).forEach(id => woodTex(id));
 })();
 </script>
 </body>

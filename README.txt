@@ -16,8 +16,11 @@ WHAT IS IN THE DEMO
 - The client's real Flared blade: exact outline and handle halves from Flared.obj
 - Blade rebuilt as real plies: face veneer, inner plies, core, optional composite
   (carbon / arylate carbon / zylon carbon), visible on the edge and in the exploded view
-- Procedural wood generated in background workers (no UI freeze):
-  palisander, ebony, walnut, limba, koto, hinoki, ayous, kiri, wenge, ash
+- Wood from real scanned veneers (colour + normal map, textures/ folder), colour matched
+  to the real product photos: palisander, ebony, walnut, limba, koto, hinoki, ayous, kiri,
+  wenge, ash. Scans: Poly Haven, CC0 licence (free for commercial use).
+  New wood = add a scan or photo of the real veneer with tools/prep_textures.py
+- Sanded round edge on the face veneers
 - Natural / satin / gloss finish (clearcoat)
 - Handle wood + handle print (model name + class, white / gold / silver) as a decal
 - Country badge on the back of the handle, serial number stamped on the face,
