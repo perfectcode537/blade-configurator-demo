@@ -167,7 +167,7 @@ import MODEL from './model.js';
 const EUR = '€';
 // colour + normal maps come from real veneer scans (tools/prep_textures.py), handle = tint for hand-sanded handles
 const WOODS = {
-  palisander:{name:'Palisander', density:.85, handle:'#8c8590'},
+  palisander:{name:'Palisander', density:.85, handle:'#b4a6ae', photo:true},   // front + back taken from the real Palis photos
   ebony:     {name:'Ebony',      density:1.0},
   walnut:    {name:'Walnut',     density:.63},
   limba:     {name:'Limba',      density:.56},
@@ -261,7 +261,9 @@ key.shadow.bias = -.0004;
 key.shadow.normalBias = .01;
 const rim = new THREE.DirectionalLight(0xfff3e6, .8);
 rim.position.set(-4, 2, -3);
-scene.add(key, rim, new THREE.HemisphereLight(0xffffff, 0xd8d2c8, .5));
+const back = new THREE.DirectionalLight(0xffffff, 1.3);   // product shots light both faces evenly
+back.position.set(1, 4, -6);
+scene.add(key, rim, back, new THREE.HemisphereLight(0xffffff, 0xd8d2c8, .5));
 
 const BLADE_H = MODEL.outline.reduce((m, p) => Math.max(m, p[1]), 0);
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial({opacity:.1}));
@@ -290,8 +292,9 @@ function loadTex(url, srgb) {
 }
 function woodTex(id) {
   if (!texCache[id]) {
-    texCache[id] = Promise.all([loadTex(`textures/${id}_col.jpg`, true), loadTex(`textures/${id}_nrm.jpg`, false)])
-      .then(([map, normal]) => ({map, normal}));
+    const back = WOODS[id].photo ? loadTex(`textures/${id}_back_col.jpg`, true) : null;
+    texCache[id] = Promise.all([loadTex(`textures/${id}_col.jpg`, true), loadTex(`textures/${id}_nrm.jpg`, false), back])
+      .then(([map, normal, back]) => ({map, normal, back}));
   }
   return texCache[id];
 }
@@ -322,7 +325,7 @@ function plyGeom(shape, depth, mirror, round = 0) {
   const p = g.attributes.position, uv = g.attributes.uv;
   for (let i = 0; i < p.count; i++) {
     let u = p.getX(i) / UVS + .5;
-    if (mirror) u = 1.37 - u;
+    if (mirror) u = (mirror === true ? 1.37 : mirror) - u;   // other side of the log, or the real back photo
     uv.setXY(i, u, p.getY(i) / UVS + .02);
   }
   return g;
@@ -363,6 +366,10 @@ function printTexture() {
   const s = Math.min(1, 960 / (w1 + gap + w2));
   g.setTransform(s, 0, 0, s, 512 * (1 - s), 128 * (1 - s));
   let x = 512 - (w1 + gap + w2) / 2;
+  // black rounded label behind the print, like on the Palis handle
+  const pad = 58, h = 150, r = h / 2;
+  g.fillStyle = '#0c0b0c';
+  g.beginPath(); g.roundRect(x - pad, 128 - r, w1 + gap + w2 + 2 * pad, h, r); g.fill();
   g.fillStyle = '#ffffff';
   g.font = '700 92px Montserrat, Arial, sans-serif';
   g.fillText(main, x, 128);
@@ -473,10 +480,11 @@ async function build() {
   let z = thickness / 2;
   stack.forEach(l => {
     const zb = z - l.t, zc = (z + zb) / 2;
+    const backPhoto = l.outer && zc < 0 && !l.comp && !!tex[l.wood].back;
     const mat = l.comp
       ? new THREE.MeshPhysicalMaterial({color:COMPOSITES[l.comp].color, roughness:.35, metalness:.3, clearcoat:.6})
-      : woodMat(tex[l.wood], cfg.finish, l.outer ? 1 : .5);
-    const m = new THREE.Mesh(plyGeom(BLADE_SHAPE, l.t, zc < 0, l.outer ? .22 : 0), mat);
+      : woodMat(backPhoto ? {...tex[l.wood], map:tex[l.wood].back} : tex[l.wood], cfg.finish, l.outer ? 1 : .5);
+    const m = new THREE.Mesh(plyGeom(BLADE_SHAPE, l.t, backPhoto ? 1 : zc < 0, l.outer ? .22 : 0), mat);
     m.position.z = zb;
     m.castShadow = m.receiveShadow = true;
     m.userData = {base:zb, zc, push:0};
